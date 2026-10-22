@@ -13,6 +13,18 @@
 亮色、暗色、跟随系统都会自动生效，因为插件是在当前配色之上叠一层
 token，而不是新增一个独立主题。
 
+## 效果对照
+
+左为内置外观，右为启用本插件后（同一页面、同一缩放）：
+
+| 内置外观 | 极简主题 |
+| --- | --- |
+| ![启用前：菜单](docs/images/before-menu.png) | ![启用后：菜单](docs/images/after-menu.png) |
+| ![启用前：设置](docs/images/before-settings.png) | ![启用后：设置](docs/images/after-settings.png) |
+
+最容易观察到的三处差异：菜单从半透明模糊变成不透明白底、浮层投影消失、
+设置面板圆角从 28px 收到 20px。
+
 ## 为什么用 token 层而不是主题 id
 
 DSH 的 `ctx.theme.register()` 可以注册第三方主题 id，但 Appearance 设置
