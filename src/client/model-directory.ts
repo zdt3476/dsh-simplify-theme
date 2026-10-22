@@ -1,0 +1,80 @@
+/**
+ * 模型目录的懒加载快照。
+ *
+ * 目录来自 `ctx.modelDirectories.directoryFor(sessionId)`：store 的快照
+ * `{ current, groups, failures, status, pending, error }`，`load()` 幂等。
+ * 选择走 `directory.select({ provider, model, reasoningEffort? })`。
+ */
+
+export interface ReasoningMeta {
+  defaultEffort?: string
+  efforts?: ReadonlyArray<{ id: string; name: string }>
+}
+
+export interface CatalogModel {
+  id: string
+  name: string
+  reasoning?: ReasoningMeta
+}
+
+export interface CatalogGroup {
+  id: string
+  name: string
+  models: CatalogModel[]
+}
+
+export interface ModelSelection {
+  provider: string
+  model: string
+  reasoningEffort?: string
+}
+
+export interface DirectorySnapshot {
+  current: ModelSelection | null
+  groups: CatalogGroup[]
+  failures: ReadonlyArray<unknown>
+  status: 'idle' | 'loading' | 'ready' | 'error' | 'selecting'
+  pending: ModelSelection | null
+  error: string | null
+}
+
+export interface ModelDirectory {
+  store: {
+    subscribe: (listener: () => void) => () => void
+    getSnapshot: () => DirectorySnapshot
+  }
+  load: () => Promise<DirectorySnapshot>
+  select: (selection: ModelSelection) => Promise<{ ok: boolean; error?: { code: string; message: string } }>
+}
+
+export interface ModelDirectories {
+  directoryFor: (sessionId: string) => ModelDirectory
+}
+
+/** 深方优先（DeepSeek 账号、官方）再保持目录序，与内置一致。 */
+export function orderGroups(groups: readonly CatalogGroup[]): CatalogGroup[] {
+  const rank = (id: string) => (id === 'deepseek-account' ? 0 : id === 'deepseek-official' ? 1 : 2)
+  return [...groups].sort((left, right) => rank(left.id) - rank(right.id))
+}
+
+/** 选中模型在目录里的元数据；丢失目录项时返回 undefined。 */
+export function reasoningFor(groups: readonly CatalogGroup[], selection: ModelSelection | null): ReasoningMeta | undefined {
+  if (selection === null) return undefined
+  return groups.find((group) => group.id === selection.provider)?.models.find((model) => model.id === selection.model)?.reasoning
+}
+
+/** 选中项的展示名；目录丢失时回落到模型 id。 */
+export function displayName(groups: readonly CatalogGroup[], selection: ModelSelection | null): string {
+  if (selection === null) return ''
+  const model = groups.find((group) => group.id === selection.provider)?.models.find((model) => model.id === selection.model)
+  return model?.name ?? selection.model
+}
+
+/** 当前思考等级的展示名；无元数据返回 undefined。 */
+export function effortLabel(groups: readonly CatalogGroup[], selection: ModelSelection | null): string | undefined {
+  const meta = reasoningFor(groups, selection)
+  if (meta === undefined || meta.efforts === undefined) return undefined
+  const current = selection?.reasoningEffort ?? meta.defaultEffort
+  if (current === undefined) return undefined
+  return meta.efforts.find((level) => level.id === current)?.name ?? current
+}
