@@ -1,0 +1,11 @@
+# 注册极简主题插件。
+#
+# Host 侧只占一个 Loader 条目，没有运行时行为；实际效果全部由 Client 侧
+# 通过 `ctx.theme.overrideTokens()` 叠一层 token 实现，因此整套皮肤会跟随
+# 用户选择的 light / dark / system，而不是新增一个独立配色。
+#
+# 想临时关掉皮肤，直接在插件管理里禁用本插件即可；卸载 token 层后界面
+# 会立即还原成内置配色，不残留任何偏好设置。
+- insert:
+    - id: simplify-theme
+      name: dsh-simplify-theme
