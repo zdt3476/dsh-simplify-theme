@@ -88,8 +88,12 @@ pnpm build
 dsh plugin --profile desktop add link:"$PWD"
 ```
 
-也可以从 GUI 的 **Plugins** 页面安装本地目录。安装后重启 DSH；若 profile
-启用了 HMR，插件管理操作会自动生效。
+也可以从 GUI 的 **Plugins** 页面安装本地目录。首次安装后需要重启 DSH；
+之后改代码只需 `pnpm build`，再刷新界面（Web/桌面的页面刷新即可，不用重启
+整个应用）——插件包是按页面加载时读取的。
+
+激活时控制台会打印一行 `[dsh-simplify-theme] 已加载构建 <版本+构建时间>`，同时写到
+`<html data-dsh-simplify-build>`；界面没变化时先比对这行，确认加载的是最新构建。
 
 ## 关闭与卸载
 

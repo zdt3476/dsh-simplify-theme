@@ -30,6 +30,10 @@ import type { PermissionSession } from './permission-control'
 
 const PLUGIN_ID = 'dsh-simplify-theme'
 
+/** 构建时注入；未注入（本地直接跑源码）时回落到 dev。 */
+declare const __DSH_SIMPLIFY_BUILD__: string
+const BUILD = typeof __DSH_SIMPLIFY_BUILD__ === 'string' ? __DSH_SIMPLIFY_BUILD__ : 'dev'
+
 interface LocaleService {
   register: (ns: string, dicts: Record<string, Record<string, string>>) => () => void
   bind: (ns: string) => (key: string, params?: Record<string, string | number>) => string
@@ -361,6 +365,10 @@ function step(label: string, run: () => void): void {
 }
 
 export function apply(ctx: ClientCtx): void {
+  // 每次激活打印一次构建标记，并写到 <html> 上：重启后仍看不到新样式时，
+  // 先确认运行的是不是最新构建，而不是继续怀疑功能本身。
+  console.info(`[${PLUGIN_ID}] 已加载构建 ${BUILD}`)
+  if (typeof document !== 'undefined') document.documentElement.dataset.dshSimplifyBuild = BUILD
   step('locale', () => ctx.locale.register(PLUGIN_ID, { zh: DICT_ZH, en: DICT_EN }))
   if (ctx.theme !== undefined) {
     step('theme', () => ctx.effect(() => ctx.theme!.overrideTokens(THEME_SOURCE, SIMPLIFY_TOKENS), 'simplify-theme: token layer'))

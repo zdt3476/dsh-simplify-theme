@@ -9,6 +9,8 @@ const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')
 }
 
 const banner = `/** ${pkg.name} v${pkg.version} — ${pkg.description} */`
+/** 注入构建时间：便于确认运行中的到底是哪一版，重启后仍不对时可直接比对。 */
+const buildStamp = new Date().toISOString()
 
 export default defineConfig([
   {
@@ -32,6 +34,7 @@ export default defineConfig([
     format: ['cjs'],
     platform: 'browser',
     target: 'es2024',
+    define: { __DSH_SIMPLIFY_BUILD__: JSON.stringify(`${pkg.version}+${buildStamp}`) },
     dts: false,
     sourcemap: true,
     clean: false,
