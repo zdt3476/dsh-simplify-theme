@@ -181,7 +181,12 @@ export function createPermissionControl(props: PermissionControlProps) {
         'data-dsh-simplify-popup': '',
         ref: (el: HTMLElement | null) => { popupRef.current = el },
         style: pos === null ? { visibility: 'hidden' } : { left: pos.left, top: pos.top }
-      }, rows) : null
+      },
+      h('div', { 'data-dsh-simplify-popup-head': '' },
+        h('span', { 'data-dsh-simplify-grid-title': '' }, t('permission.title')),
+        h('span', { 'data-dsh-simplify-grid-hint': '' }, t('permission.hint'))
+      ),
+      rows) : null
     )
   }
 }

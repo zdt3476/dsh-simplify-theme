@@ -8,7 +8,7 @@
  */
 
 import type { ModelDirectories, ModelSelection, CatalogGroup } from './model-directory'
-import { effortLabel, effortLevels, displayName, orderGroups } from './model-directory'
+import { effortLabel, effortLevels, displayName, orderGroups, providerColor } from './model-directory'
 import { effortName, providerName } from './localize'
 import { placePopup, measurePopup } from './popup'
 import { useDismiss } from './dock-shared'
@@ -94,12 +94,13 @@ export function createModelControl(props: ModelControlProps) {
       close()
     }
 
-    const pill = (kind: 'model' | 'effort', label: unknown) =>
+    const pill = (kind: 'model' | 'effort', label: unknown, color?: string) =>
       h('button', {
         type: 'button',
         'data-dsh-simplify-pill': '',
         'data-dsh-simplify-control': kind,
         'data-dsh-simplify-emphasis': kind,
+        style: color === undefined ? undefined : { '--dsh-simplify-provider-color': color },
         'aria-label': kind === 'effort' ? `${t('effort.title')}：${effort ?? t('effort.unavailableShort')}` : undefined,
         'aria-haspopup': 'dialog',
         'aria-expanded': open === kind ? 'true' : 'false',
@@ -117,11 +118,13 @@ export function createModelControl(props: ModelControlProps) {
       label,
       h('span', { 'data-dsh-simplify-pill-caret': '', 'aria-hidden': 'true' }))
 
-    const children: unknown[] = [
-      pill('model', name === '' ? t('model.placeholder') : h('span', { 'data-dsh-simplify-pill-label': '' }, providerPrefix + name))
-    ]
+    // 供应商色按「有模型的供应商」在面板里的顺序取，保证同面板内不撞色。
+    const orderedProviders = groups.filter((candidate) => candidate.models.length > 0)
+    const providerIndex = group === undefined ? -1 : orderedProviders.findIndex((candidate) => candidate.id === group.id)
+    const modelPill = pill('model', name === '' ? t('model.placeholder') : h('span', { 'data-dsh-simplify-pill-label': '' }, providerPrefix + name), providerIndex < 0 || group === undefined ? undefined : providerColor(group.id, providerIndex))
+    const children: unknown[] = [modelPill]
 
-    children.push(pill('effort', h('span', { 'data-dsh-simplify-pill-label': '' }, `${t('effort.title')}：${effort ?? t('effort.unavailableShort')}`)))
+    children.push(pill('effort', h('span', { 'data-dsh-simplify-pill-label': '' }, effort ?? t('effort.unavailableShort'))))
 
     // 模型列表：平铺放大——一供应商一列，列内模型纵向排列，全目录一屏可见。
     if (open === 'model') {
@@ -133,27 +136,33 @@ export function createModelControl(props: ModelControlProps) {
       if (visibleGroups.length === 0 && state.status !== 'loading') {
         columns.push(h('div', { 'data-dsh-simplify-note': '' }, t('model.empty')))
       }
-      for (const group of visibleGroups) {
+      for (const [index, group] of visibleGroups.entries()) {
+        const color = providerColor(group.id, index)
         const models: unknown[] = []
         for (const model of group.models) {
           const active = selection !== null && selection.provider === group.id && selection.model === model.id
+          const effortCount = model.reasoning?.efforts?.length ?? 0
           models.push(
             h('button', {
               type: 'button',
               'data-dsh-simplify-item': '',
               'data-active': active ? 'true' : 'false',
+              style: { '--dsh-simplify-provider-color': color },
               key: `m:${group.id}:${model.id}`,
               onClick: () => pickModel(group.id, model.id, model.reasoning?.defaultEffort)
             },
             h('span', { style: { flex: 1, minWidth: 0 } }, model.name),
-            model.reasoning?.efforts !== undefined && model.reasoning.efforts.length > 1 ? h('span', { 'data-dsh-simplify-badge': '' }, String(model.reasoning.efforts.length)) : null,
-            active ? '✓' : null
+            effortCount > 1 ? h('span', { 'data-dsh-simplify-badge': '' }, String(effortCount)) : null,
+            active ? h('span', { 'data-dsh-simplify-check': '', 'aria-hidden': 'true' }, '✓') : null
             )
           )
         }
         columns.push(
-          h('div', { 'data-dsh-simplify-column': '', key: `g:${group.id}` },
-            h('div', { 'data-dsh-simplify-group': '' }, providerName(group.id, group.name)),
+          h('div', { 'data-dsh-simplify-column': '', key: `g:${group.id}`, style: { '--dsh-simplify-provider-color': color } },
+            h('div', { 'data-dsh-simplify-group': '' },
+              h('span', { 'data-dsh-simplify-provider-dot': '', 'aria-hidden': 'true' }),
+              h('span', { 'data-dsh-simplify-provider-name': '' }, providerName(group.id, group.name))
+            ),
             h('div', { 'data-dsh-simplify-column-body': '' }, models)
           )
         )
@@ -163,7 +172,12 @@ export function createModelControl(props: ModelControlProps) {
         'data-dsh-simplify-model-grid': '',
         ref: (el: HTMLElement | null) => { popupRef.current = el },
         style: pos === null ? { visibility: 'hidden' } : { left: pos.left, top: pos.top }
-      }, columns))
+      },
+      h('div', { 'data-dsh-simplify-grid-head': '' },
+        h('span', { 'data-dsh-simplify-grid-title': '' }, t('model.title')),
+        visibleGroups.length === 0 ? null : h('span', { 'data-dsh-simplify-grid-hint': '' }, t('model.providers', { count: visibleGroups.length }))
+      ),
+      h('div', { 'data-dsh-simplify-grid-columns': '' }, columns)))
     }
 
     // 思考等级滑块：标题行给出当前档位，轨道带填充进度，刻度文字标出全部档位。

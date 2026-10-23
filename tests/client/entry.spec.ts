@@ -62,8 +62,8 @@ describe('client entry', () => {
     expect(injected).not.toContain('conversation.input.model.label')
 
     expect(localeRegister).toHaveBeenCalledWith('dsh-simplify-theme', expect.objectContaining({
-      zh: expect.objectContaining({ 'filter.placeholder': '筛选工作区或会话…', 'filter.ariaLabel': '筛选工作区或会话', 'effort.providerDefault': '供应商默认' }),
-      en: expect.objectContaining({ 'filter.placeholder': 'Filter workspaces or sessions…', 'effort.providerDefault': 'Provider default' })
+      zh: expect.objectContaining({ 'filter.placeholder': '筛选工作区或会话…', 'filter.ariaLabel': '筛选工作区或会话', 'effort.providerDefault': '默认' }),
+      en: expect.objectContaining({ 'filter.placeholder': 'Filter workspaces or sessions…', 'effort.providerDefault': 'Default' })
     }))
   })
 })

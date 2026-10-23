@@ -55,6 +55,26 @@ export interface ModelDirectories {
   directoryFor: (sessionId: string) => ModelDirectory
 }
 
+/** 供应商强调色：按 id 稳定取色，避免供应商增减时颜色互相串位。 */
+const PROVIDER_COLORS = [
+  'var(--dsw-alias-state-business-primary)',
+  'var(--dsw-alias-state-success-primary)',
+  'var(--dsw-alias-state-warn-primary)',
+  'var(--dsw-alias-state-error-primary)'
+]
+
+/**
+ * 供应商强调色。
+ * @param id 供应商 id；仅在没有序号时用于取色。
+ * @param index 供应商在排序后列表中的位置——优先使用，避免两个供应商撞色。
+ */
+export function providerColor(id: string, index?: number): string {
+  if (index !== undefined) return PROVIDER_COLORS[index % PROVIDER_COLORS.length]
+  let hash = 0
+  for (let position = 0; position < id.length; position += 1) hash = (hash * 31 + id.charCodeAt(position)) % 100000
+  return PROVIDER_COLORS[hash % PROVIDER_COLORS.length]
+}
+
 /** 深方优先（DeepSeek 账号、官方）再保持目录序，与内置一致。 */
 export function orderGroups(groups: readonly CatalogGroup[]): CatalogGroup[] {
   const rank = (id: string) => (id === 'deepseek-account' ? 0 : id === 'deepseek-official' ? 1 : 2)
@@ -78,7 +98,7 @@ export function displayName(groups: readonly CatalogGroup[], selection: ModelSel
  * 当前思考等级的展示名。目录元数据缺失时回落到原始 effort id——原生触发器
  * 在这种场景也显示 id，这里保持一致，避免思考等级 pill 无声消失。
  */
-export function effortLabel(groups: readonly CatalogGroup[], selection: ModelSelection | null, defaultLabel = '供应商默认', retainedEffort?: string): string | undefined {
+export function effortLabel(groups: readonly CatalogGroup[], selection: ModelSelection | null, defaultLabel = '默认', retainedEffort?: string): string | undefined {
   if (selection === null) return undefined
   const meta = reasoningFor(groups, selection)
   const current = selection.reasoningEffort ?? meta?.defaultEffort ?? retainedEffort

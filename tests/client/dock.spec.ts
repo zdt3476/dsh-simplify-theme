@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { effortLabel, effortLevels, displayName, orderGroups, reasoningFor } from '../../src/client/model-directory'
+import { effortLabel, effortLevels, displayName, orderGroups, providerColor, reasoningFor } from '../../src/client/model-directory'
 import { computeHiddenRows, readRow } from '../../src/client/sidebar-filter'
 import { tabLabels } from '../../src/client/sidebar-tabs'
 import { placePopup } from '../../src/client/popup'
@@ -25,7 +25,7 @@ describe('model directory helpers', () => {
     const selection = { provider: 'openai', model: 'gpt-5', reasoningEffort: 'medium' }
     expect(displayName(groups, selection)).toBe('GPT-5')
     expect(effortLabel(groups, selection)).toBe('中')
-    expect(effortLabel([{ id: 'p', name: 'P', models: [{ id: 'm', name: 'M', reasoning: { efforts: [{ id: 'high', name: '高' }] } }] }], { provider: 'p', model: 'm' })).toBe('供应商默认')
+    expect(effortLabel([{ id: 'p', name: 'P', models: [{ id: 'm', name: 'M', reasoning: { efforts: [{ id: 'high', name: '高' }] } }] }], { provider: 'p', model: 'm' })).toBe('默认')
     expect(effortLabel(groups, { provider: 'deepseek-official', model: 'deepseek-flash' })).toBeUndefined()
     expect(effortLabel(groups, { provider: 'openai', model: 'gpt-5' })).toBe('高')
     expect(reasoningFor(groups, { provider: 'none', model: 'x' })).toBeUndefined()
@@ -217,5 +217,14 @@ describe('hero dock helpers', () => {
     expect(readCurrentSessionId('{}')).toBeUndefined()
     expect(readCurrentSessionId('bad')).toBeUndefined()
     expect(readCurrentSessionId(null)).toBeUndefined()
+  })
+})
+
+describe('provider colors', () => {
+  it('同一供应商稳定取色，不同供应商分散', () => {
+    const a = providerColor('deepseek-official')
+    expect(providerColor('deepseek-official')).toBe(a)
+    const colors = new Set(['deepseek-official', 'deepseek-account', 'openai', 'anthropic'].map(providerColor))
+    expect(colors.size).toBeGreaterThan(1)
   })
 })

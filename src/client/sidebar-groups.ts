@@ -119,10 +119,25 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
   pinButton.title = options.locale('groups.pinHint')
   controls.appendChild(pinButton)
 
+  // 面板挂到 body：侧栏标题行是 overflow:hidden，放在里面会被裁成一条。
   const panel = options.createElement('div')
   panel.dataset.dshSimplifyPinPanel = ''
   panel.hidden = true
-  controls.appendChild(panel)
+  document.body.appendChild(panel)
+
+  const placePanel = () => {
+    const rect = pinButton.getBoundingClientRect()
+    const width = panel.offsetWidth
+    const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8)
+    panel.style.left = `${Math.round(left)}px`
+    panel.style.top = `${Math.round(rect.bottom + 6)}px`
+  }
+
+  const openPanel = () => {
+    renderPanel(collectGroups(slot))
+    panel.hidden = false
+    placePanel()
+  }
 
   const persistPinned = () => localStorage.setItem(PINNED_KEY, JSON.stringify([...pinned]))
 
@@ -141,6 +156,8 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
         persistPinned()
         apply()
         renderPanel(collectGroups(slot))
+        // 选完即收起：置顶是低频操作，面板常驻会挡住列表。
+        panel.hidden = true
       })
       panel.appendChild(item)
     }
@@ -172,6 +189,9 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
       group.element.toggleAttribute('data-dsh-simplify-collapsed', collapse && !visible.has(group.id))
     }
 
+    if (pinned.size > 0) pinButton.title = `${options.locale('groups.pinHint')}（已置顶 ${pinned.size} 个）`
+    else pinButton.title = options.locale('groups.pinHint')
+
     const hidden = hiddenCount(ranked)
     toggle.hidden = hidden === 0 && !expanded
     const label = expanded
@@ -200,17 +220,26 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
 
   pinButton.addEventListener('click', (event) => {
     event.stopPropagation()
-    panel.hidden = !panel.hidden
-    if (!panel.hidden) renderPanel(collectGroups(slot))
+    if (panel.hidden) openPanel()
+    else panel.hidden = true
   })
 
   const closeOnOutside = (event: Event) => {
     if (panel.hidden) return
     const target = event.target
-    if (target instanceof Element && target.closest('[data-dsh-simplify-groups-controls]') !== null) return
+    if (target instanceof Element && (target.closest('[data-dsh-simplify-groups-controls]') !== null || target.closest('[data-dsh-simplify-pin-panel]') !== null)) return
     panel.hidden = true
   }
+  const closeOnKey = (event: KeyboardEvent) => {
+    if (event.key === 'Escape' && !panel.hidden) panel.hidden = true
+  }
+  const closeOnScroll = () => {
+    if (!panel.hidden) placePanel()
+  }
   document.addEventListener('pointerdown', closeOnOutside, true)
+  document.addEventListener('keydown', closeOnKey, true)
+  window.addEventListener('scroll', closeOnScroll, true)
+  window.addEventListener('resize', closeOnScroll)
 
   const observer = new MutationObserver(schedule)
   observer.observe(slot, { childList: true, subtree: true })
@@ -224,6 +253,9 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
       unsubscribeWorkspaces()
       unsubscribeSessions()
       document.removeEventListener('pointerdown', closeOnOutside, true)
+      document.removeEventListener('keydown', closeOnKey, true)
+      window.removeEventListener('scroll', closeOnScroll, true)
+      window.removeEventListener('resize', closeOnScroll)
       if (frame !== 0) window.cancelAnimationFrame(frame)
       for (const group of collectGroups(slot)) {
         const order = originalOrders.get(group.element)
@@ -234,6 +266,7 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
         group.row.removeAttribute('data-dsh-simplify-count')
       }
       controls.remove()
+      panel.remove()
     }
   }
 }
