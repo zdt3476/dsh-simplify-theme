@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { delegationDuration, toDelegationNode } from '../../src/client/delegation-tree'
+import { delegationDuration, selectionModel, toDelegationNode } from '../../src/client/delegation-tree'
 import { formatDelegationDuration, isDelegationTool, pickSubagentIds, turnDelegations } from '../../src/client/delegation-panel'
 
 const rows = {
@@ -125,5 +125,14 @@ describe('cross-turn claiming', () => {
     const claimed = new Set<string>()
     const turn = turnDelegations([['a'], []], [false, false], store, 'p', 0, claimed)
     expect(turn.nodes.map(node => node.id)).toEqual(['a'])
+  })
+})
+
+describe('model selection shapes', () => {
+  it('兼容 { next } 投影视图与扁平 { model }', () => {
+    expect(selectionModel({ next: { model: 'deepseek-v4.1-flash' } })).toBe('deepseek-v4.1-flash')
+    expect(selectionModel({ model: 'plain' })).toBe('plain')
+    expect(selectionModel({ next: null })).toBeUndefined()
+    expect(selectionModel(undefined)).toBeUndefined()
   })
 })

@@ -26,7 +26,8 @@ export interface SessionRow {
   parentId?: string
   origin?: string
   projectionValues?: {
-    modelSelection?: { provider?: string; model?: string }
+    // 投影线上视图是 { lastUsed, next }；next 才代表当前生效的选择。
+    modelSelection?: { provider?: string; model?: string } | { next?: { provider?: string; model?: string } | null }
     sessionStats?: { steps?: number }
     subagentTiming?: { settledMs?: number; active?: { since?: number } }
   }
@@ -55,10 +56,20 @@ export function delegationDuration(timing: SubagentTiming | undefined, now: numb
   return settled + Math.max(0, now - since)
 }
 
+/** 模型名字：兼容 { next } 视图与扁平的 { model } 两种形状。 */
+export function selectionModel(selection: { model?: string; next?: { model?: string } | null } | undefined): string | undefined {
+  if (selection === null || selection === undefined || typeof selection !== 'object') return undefined
+  const flat = selection as { model?: unknown }
+  if (typeof flat.model === 'string' && flat.model !== '') return flat.model
+  const next = (selection as { next?: { model?: unknown } | null }).next
+  const model = next?.model
+  return typeof model === 'string' && model !== '' ? model : undefined
+}
+
 /** 单个会话行 → 委派节点；不是子代理行时返回 null。 */
 export function toDelegationNode(id: string, row: SessionRow | undefined, now: number): DelegationNode | null {
   if (row === undefined || row.origin !== 'subagent') return null
-  const model = row.projectionValues?.modelSelection?.model
+  const model = selectionModel(row.projectionValues?.modelSelection)
   return {
     id,
     title: row.displayTitle ?? row.title ?? id,

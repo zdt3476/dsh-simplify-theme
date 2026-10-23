@@ -54,8 +54,12 @@ dock 行里的百分比统计按数值上色：缓存命中越高越绿、上下
 
 实现方式：先按回合容器找到 `[data-tool="subagent"]` 工具行，从行文本里取子会话
 id，再回会话列表快照（`origin: 'subagent'` + `parentId` + `projectionValues`）取
-标题、模型、步骤与耗时，所以卡片随子代理运行状态实时更新；工具行 `data-state`
-为 error/denied 时卡片标红为失败。点击任意子代理卡片可直接打开它的会话。
+标题、模型（`modelSelection.next.model`）、步骤（`sessionStats.steps`）与耗时
+（`subagentTiming`）——运行中的耗时每秒刷新一次，结束后停在结算值；工具行
+`data-state` 为 error/denied 时卡片标红为失败。点击任意子代理卡片直接打开它的会话。
+
+刚创建、还没被打开过的子代理可能只有标题（catalog-only，没有投影值）：此时会主动
+调一次 `sessions.refreshProjections(父会话)` 把统计补齐，每个父会话只尝试一次。
 同一个子代理只会出现在认领它的那一轮里；工具行没暴露 id 时按快照顺序兜底补齐。
 
 本轮回答结束后，回复操作行的最右侧会追加该轮耗时（如 `· 耗时 12.3 秒`）。它按会话运行状态的墙钟时间计算，包含排队与流式等待，和原生折叠行的统计口径可能略有差异。

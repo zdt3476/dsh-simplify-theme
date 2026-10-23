@@ -92,7 +92,12 @@ export function formatDelegationDuration(ms: number, locale: (key: string) => st
 }
 
 export interface DelegationPanelOptions {
-  sessions: { getSnapshot: () => { byId: SessionRows }; subscribe: (listener: () => void) => () => void }
+  sessions: {
+    getSnapshot: () => { byId: SessionRows }
+    subscribe: (listener: () => void) => () => void
+    /** 主动拉一次父会话投影；catalog-only 的子会话靠它补齐步骤与耗时。 */
+    refreshProjections?: (sessionId: string) => Promise<unknown> | void
+  }
   currentSessionId: () => string | undefined
   locale: (key: string, params?: Record<string, string | number>) => string
   /** 点卡片跳到对应子会话。 */
@@ -218,6 +223,20 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     host.replaceChildren(card)
   }
 
+  // 子代理运行中耗时需要每秒走一格；没有运行中的节点时停表。
+  let ticker: number | undefined
+  const armTicker = (running: boolean) => {
+    if (running && ticker === undefined) {
+      ticker = window.setInterval(schedule, 1000)
+    } else if (!running && ticker !== undefined) {
+      window.clearInterval(ticker)
+      ticker = undefined
+    }
+  }
+
+  // 每个父会话只主动拉一次投影，失败后允许重试。
+  const refreshed = new Set<string>()
+
   const sync = () => {
     const parentId = options.currentSessionId()
     const rows = options.sessions.getSnapshot().byId
@@ -225,6 +244,8 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     const turns = [...document.querySelectorAll(TURN)]
     // 跨回合共享「已认领」集合：同一个子代理只出现在它所属的回合里。
     const claimed = new Set<string>()
+    let anyRunning = false
+    let missingProjection = false
     for (const turn of turns) {
       const toolRows = [...turn.querySelectorAll<HTMLElement>(TOOL_ROW)].filter((row) => isDelegationTool(row.getAttribute('data-tool')))
       if (toolRows.length === 0) {
@@ -233,9 +254,22 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
       }
       const ids = toolRows.map((row) => pickSubagentIds(row.textContent ?? '', rows, parentId))
       const failed = toolRows.map((row) => row.getAttribute('data-state') === 'error' || row.getAttribute('data-state') === 'denied')
-      renderCard(turn, turnDelegations(ids, failed, rows, parentId, now, claimed))
+      const delegation = turnDelegations(ids, failed, rows, parentId, now, claimed)
+      if (delegation.nodes.some((node) => node.status === 'running')) anyRunning = true
+      if (delegation.nodes.some((node) => node.steps === undefined && node.durationMs === undefined)) missingProjection = true
+      renderCard(turn, delegation)
+    }
+    armTicker(anyRunning)
+    // 刚创建、还没被打开过的子会话可能只有 label：拉一次父会话投影把统计补齐。
+    if (missingProjection && parentId !== undefined && !refreshed.has(parentId) && options.sessions.refreshProjections !== undefined) {
+      refreshed.add(parentId)
+      void Promise.resolve(options.sessions.refreshProjections(parentId)).catch(() => {
+        refreshed.delete(parentId)
+      })
     }
   }
+
+
 
   let frame = 0
   const schedule = () => {
@@ -259,6 +293,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     dispose: () => {
       unsubscribe()
       observer.disconnect()
+      if (ticker !== undefined) window.clearInterval(ticker)
       if (frame !== 0) window.cancelAnimationFrame(frame)
       for (const host of document.querySelectorAll(`[${HOST_ATTR}-host]`)) host.remove()
     }

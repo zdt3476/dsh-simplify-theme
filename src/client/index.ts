@@ -47,6 +47,7 @@ interface SlotRegistry {
 
 interface SessionsService {
   list: ActivityStore<SessionActivitySnapshot>
+  refreshProjections?: (sessionId: string) => Promise<unknown>
   binding: (sessionId: string) => { session?: PermissionSession } | undefined
   scope?: (sessionId: string) => unknown
 }
@@ -334,7 +335,11 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
     if (sessions === undefined) return
     const t = withFallback(ctx.locale.bind(PLUGIN_ID), DICT_ZH)
     const panel = mountDelegationPanel({
-      sessions: sessions as never,
+      sessions: {
+        getSnapshot: () => sessions.getSnapshot() as never,
+        subscribe: (listener) => sessions.subscribe(listener),
+        refreshProjections: (sessionId) => ctx.sessions?.refreshProjections?.(sessionId)
+      },
       currentSessionId: () => readCurrentSessionId(localStorage.getItem(CURRENT_SESSION_KEY)),
       locale: t,
       openSession: (sessionId: string) => {
