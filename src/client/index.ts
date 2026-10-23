@@ -20,6 +20,7 @@ import type { ActivityStore, SessionActivitySnapshot, WorkspaceActivitySnapshot 
 import { mountHeroDock } from './hero-dock'
 import { mountStatColors } from './stat-colors-mount'
 import { mountTurnDuration } from './turn-duration'
+import { mountDelegationPanel } from './delegation-panel'
 import { CURRENT_SESSION_KEY, readCurrentSessionId } from './hero-dock'
 import { readArchivedFilter, VIEW_STORE_KEY } from './view-state'
 import { withFallback } from './locale-fallback'
@@ -110,6 +111,14 @@ const DICT_ZH: Record<string, string> = {
   'permission.confirmEnable': '我已了解风险，继续启用',
   'permission.cancel': '取消',
   'duration.took': '耗时',
+  'delegation.title': '子代理',
+  'delegation.agent': '主 Agent',
+  'delegation.coordinating': '正在协调 {count} 个委派任务',
+  'delegation.running': '{count} 个运行中',
+  'delegation.finished': '已完成',
+  'delegation.state.running': '运行中',
+  'delegation.state.done': '已完成',
+  'delegation.steps': '{count} 个步骤',
   'duration.ms': '毫秒',
   'duration.s': '秒',
   'duration.m': '分',
@@ -151,6 +160,14 @@ const DICT_EN: Record<string, string> = {
   'permission.confirmEnable': 'I understand the risk, continue',
   'permission.cancel': 'Cancel',
   'duration.took': 'took',
+  'delegation.title': 'Subagents',
+  'delegation.agent': 'Main agent',
+  'delegation.coordinating': 'Coordinating {count} delegated tasks',
+  'delegation.running': '{count} running',
+  'delegation.finished': 'Completed',
+  'delegation.state.running': 'Running',
+  'delegation.state.done': 'Completed',
+  'delegation.steps': '{count} steps',
   'duration.ms': 'ms',
   'duration.s': 's',
   'duration.m': 'm',
@@ -310,12 +327,25 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
     const sessions = ctx.sessions?.list
     if (sessions === undefined) return
     const t = withFallback(ctx.locale.bind(PLUGIN_ID), DICT_ZH)
+    const reactModule = require('react') as unknown as { createElement: unknown }
+    const reactDom = require('react-dom/client') as unknown as { createRoot: (c: HTMLElement) => { render: (n: unknown) => void; unmount: () => void } }
+    const panel = mountDelegationPanel({
+      sessions: sessions as never,
+      currentSessionId: () => readCurrentSessionId(localStorage.getItem(CURRENT_SESSION_KEY)),
+      locale: t,
+      h: reactModule.createElement as never,
+      hooks: require('react') as never,
+      React: { createRoot: (container) => reactDom.createRoot(container) }
+    })
     const mount = mountTurnDuration({
       sessions,
       currentSessionId: () => readCurrentSessionId(localStorage.getItem(CURRENT_SESSION_KEY)),
       locale: t
     })
-    return () => mount?.unmount()
+    return () => {
+      mount?.unmount()
+      panel?.dispose()
+    }
   }, 'simplify-theme: turn duration')
 }
 

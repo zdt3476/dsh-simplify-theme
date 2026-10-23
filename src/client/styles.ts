@@ -504,6 +504,178 @@ export const UI_CSS = `
   font-weight: 600;
 }
 
+/* —— 子代理编排卡片 —— */
+[data-dsh-simplify-delegation-host] { display: block; }
+
+[data-dsh-simplify-delegations] {
+  margin: 0 0 12px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-layer-2);
+  overflow: hidden;
+}
+
+[data-dsh-simplify-delegation-head] {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-dsh-simplify-delegation-head]:hover { background: var(--dsw-alias-interactive-bg-hover); }
+
+[data-dsh-simplify-delegation-chevron] {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--dsw-alias-label-caption);
+  transition: transform 0.12s ease;
+}
+
+[data-dsh-simplify-delegations][data-collapsed='true'] [data-dsh-simplify-delegation-chevron] { transform: rotate(-90deg); }
+
+[data-dsh-simplify-delegation-heading] { font-weight: 600; color: var(--dsw-alias-label-primary); }
+[data-dsh-simplify-delegation-summary] { color: var(--dsw-alias-label-tertiary); }
+[data-dsh-simplify-delegation-total] {
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 单层图：左侧主 Agent，右侧子代理列表，中间一条连接线 */
+[data-dsh-simplify-delegation-graph] {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 4px 12px 12px;
+}
+
+[data-dsh-simplify-delegation-root] {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 180px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+[data-dsh-simplify-delegation-root-icon] {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-business-primary);
+}
+
+[data-dsh-simplify-delegation-root-copy] {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+[data-dsh-simplify-delegation-root-copy] > strong { color: var(--dsw-alias-label-primary); font-weight: 600; }
+[data-dsh-simplify-delegation-root-copy] > span { color: var(--dsw-alias-label-tertiary); font-size: 11px; }
+
+[data-dsh-simplify-delegation-connector] {
+  flex: none;
+  width: 12px;
+  height: 1px;
+  background: var(--dsw-alias-border-l2);
+}
+
+[data-dsh-simplify-delegation-agents] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* 主干：从第一个子代理连到最后一个，避免只剩几条断开的横线 */
+[data-dsh-simplify-delegation-agents]::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 18px;
+  bottom: 18px;
+  width: 1px;
+  background: var(--dsw-alias-border-l2);
+}
+
+[data-dsh-simplify-delegation-node] {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-md);
+}
+
+/* 每个子代理左侧的短横线，接出主 Agent 的连接线 */
+[data-dsh-simplify-delegation-node]::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 18px;
+  width: 12px;
+  height: 1px;
+  background: var(--dsw-alias-border-l2);
+}
+
+[data-dsh-simplify-delegation-icon] {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-success-primary);
+}
+
+[data-dsh-simplify-delegation-icon][data-status='running'] { background: var(--dsw-alias-state-business-primary); }
+
+[data-dsh-simplify-delegation-body] { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+[data-dsh-simplify-delegation-title] { color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; }
+
+[data-dsh-simplify-delegation-meta] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-dsh-simplify-delegation-model] {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+[data-dsh-simplify-delegation-state][data-status='running'] { color: var(--dsw-alias-state-business-primary); }
+[data-dsh-simplify-delegation-state][data-status='done'] { color: var(--dsw-alias-state-success-primary); }
+
 /* —— 回合耗时 —— */
 [data-dsh-simplify-duration] {
   flex: none;
