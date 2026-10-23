@@ -59,7 +59,7 @@ export function createModelControl(props: ModelControlProps) {
       if (trigger === null || popup === null) return
       const rect = trigger.getBoundingClientRect()
       const size = measurePopup(popup)
-      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }))
+      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }, 'right'))
     }, [open, state.groups.length])
 
     hooks.useEffect(() => {
@@ -111,21 +111,21 @@ export function createModelControl(props: ModelControlProps) {
       children.push(pill('effort', h('span', { 'data-dsh-simplify-pill-label': '' }, effort)))
     }
 
-    // 模型列表
+    // 模型列表：平铺放大——一供应商一列，列内模型纵向排列，全目录一屏可见。
     if (open === 'model') {
-      const rows: unknown[] = []
+      const columns: unknown[] = []
+      const visibleGroups = groups.filter((group) => group.models.length > 0)
       if (state.status === 'error' || state.error !== null) {
-        rows.push(h('div', { 'data-dsh-simplify-note': '', 'data-dsh-simplify-error': '' }, state.error ?? t('error.load')))
+        columns.push(h('div', { 'data-dsh-simplify-note': '', 'data-dsh-simplify-error': '' }, state.error ?? t('error.load')))
       }
-      if (groups.length === 0 && state.status !== 'loading') {
-        rows.push(h('div', { 'data-dsh-simplify-note': '' }, t('model.empty')))
+      if (visibleGroups.length === 0 && state.status !== 'loading') {
+        columns.push(h('div', { 'data-dsh-simplify-note': '' }, t('model.empty')))
       }
-      for (const group of groups) {
-        if (group.models.length === 0) continue
-        rows.push(h('div', { 'data-dsh-simplify-group': '', key: `g:${group.id}` }, group.id === 'deepseek-account' ? t('provider.account') : group.name))
+      for (const group of visibleGroups) {
+        const models: unknown[] = []
         for (const model of group.models) {
           const active = selection !== null && selection.provider === group.id && selection.model === model.id
-          rows.push(
+          models.push(
             h('button', {
               type: 'button',
               'data-dsh-simplify-item': '',
@@ -139,12 +139,19 @@ export function createModelControl(props: ModelControlProps) {
             )
           )
         }
+        columns.push(
+          h('div', { 'data-dsh-simplify-column': '', key: `g:${group.id}` },
+            h('div', { 'data-dsh-simplify-group': '' }, group.id === 'deepseek-account' ? t('provider.account') : group.name),
+            h('div', { 'data-dsh-simplify-column-body': '' }, models)
+          )
+        )
       }
       children.push(h('div', {
         'data-dsh-simplify-popup': '',
+        'data-dsh-simplify-model-grid': '',
         ref: (el: HTMLElement | null) => { popupRef.current = el },
         style: pos === null ? { visibility: 'hidden' } : { left: pos.left, top: pos.top }
-      }, rows))
+      }, columns))
     }
 
     // 思考等级滑块
@@ -193,4 +200,29 @@ export function createModelControl(props: ModelControlProps) {
 
     return h('div', { 'data-dsh-simplify-dock-root': '' }, children)
   }
+}
+
+export interface ColumnBuildInput {
+  groups: readonly { id: string; name: string; models: readonly { id: string; name: string; reasoning?: { defaultEffort?: string; efforts?: readonly { id: string; name: string }[] } }[] }[]
+  selection: { provider: string; model: string } | null
+  accountLabel: string
+}
+
+/**
+ * 平铺网格的列数据：一供应商一列；返回列头与列内条目 id 列表（展示名）。
+ * 独立成纯函数供单测；组件侧只负责把它渲染成 DOM。
+ */
+export function buildModelColumns(input: ColumnBuildInput): Array<{ id: string; label: string; models: Array<{ id: string; name: string; active: boolean; effortCount: number }> }> {
+  return input.groups
+    .filter((group) => group.models.length > 0)
+    .map((group) => ({
+      id: group.id,
+      label: group.id === 'deepseek-account' ? input.accountLabel : group.name,
+      models: group.models.map((model) => ({
+        id: model.id,
+        name: model.name,
+        active: input.selection !== null && input.selection.provider === group.id && input.selection.model === model.id,
+        effortCount: model.reasoning?.efforts?.length ?? 0
+      }))
+    }))
 }

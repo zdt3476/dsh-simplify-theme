@@ -15,6 +15,16 @@ export const UI_CSS = `
 }
 
 [data-dsh-simplify-dock] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+[data-dsh-simplify-dock-left],
+[data-dsh-simplify-dock-right] {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -87,6 +97,57 @@ export const UI_CSS = `
   padding: 4px;
   font-size: 13px;
   line-height: 20px;
+}
+
+/* 模型平铺面板：一供应商一列 */
+[data-dsh-simplify-model-grid] {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 320px;
+  max-width: min(90vw, 960px);
+  max-height: min(480px, 100vh - 96px);
+  padding: 8px;
+}
+
+[data-dsh-simplify-column] {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  max-width: 240px;
+  flex: 1 1 0;
+}
+
+[data-dsh-simplify-column] [data-dsh-simplify-group] {
+  position: static;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+[data-dsh-simplify-column-body] {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+[data-dsh-simplify-model-grid] [data-dsh-simplify-item] {
+  padding: 7px 10px;
+  border-radius: var(--dsw-radius-sm);
+  min-height: 32px;
+}
+
+[data-dsh-simplify-model-grid] [data-dsh-simplify-item]:hover,
+[data-dsh-simplify-model-grid] [data-dsh-simplify-item][data-active='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+[data-dsh-simplify-column] + [data-dsh-simplify-column] {
+  border-left: 1px solid var(--dsw-alias-border-l1);
+  padding-left: 8px;
 }
 
 [data-dsh-simplify-popup] [data-dsh-simplify-group] {

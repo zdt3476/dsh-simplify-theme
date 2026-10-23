@@ -31,7 +31,11 @@ export function createDockControl(props: DockHostProps) {
   const h = props.shared.h
 
   // 两个控件是独立组件：必须作为元素渲染（hooks 才有效），不能直接函数调用。
+  // 布局：权限在左缘，模型(+思考等级)在右缘，dock 行两端对齐。
   return function DockControl() {
-    return h('div', { 'data-dsh-simplify-dock': '' }, h(model as never, {}), h(permission as never, {}))
+    return h('div', { 'data-dsh-simplify-dock': '' },
+      h('div', { 'data-dsh-simplify-dock-left': '' }, h(permission as never, {})),
+      h('div', { 'data-dsh-simplify-dock-right': '' }, h(model as never, {}))
+    )
   }
 }

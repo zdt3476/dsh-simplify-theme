@@ -5,6 +5,7 @@ import { tabLabels } from '../../src/client/sidebar-tabs'
 import { placePopup } from '../../src/client/popup'
 import { readArchivedFilter } from '../../src/client/view-state'
 import { presetLabel, CONFIRM_PRESETS } from '../../src/client/permission-catalog'
+import { buildModelColumns } from '../../src/client/model-control'
 
 describe('model directory helpers', () => {
   const groups = [
@@ -113,5 +114,28 @@ describe('permission labels', () => {
   it('高危预设集合包含完全权限与自动审查', () => {
     expect(CONFIRM_PRESETS.has('danger-full-access')).toBe(true)
     expect(CONFIRM_PRESETS.has('auto')).toBe(true)
+  })
+})
+
+describe('model grid columns', () => {
+  const groups = [
+    { id: 'openai', name: 'OpenAI', models: [{ id: 'gpt-5', name: 'GPT-5', reasoning: { efforts: [{ id: 'low', name: '低' }, { id: 'high', name: '高' }] } }, { id: 'gpt-5-mini', name: 'GPT-5 mini' }] },
+    { id: 'deepseek-account', name: 'DeepSeek 账号', models: [{ id: 'sp', name: 'S 系' }] },
+    { id: 'empty', name: '空目录', models: [] }
+  ]
+
+  it('一供应商一列，空组剔除，账号组用本地化名', () => {
+    const columns = buildModelColumns({ groups, selection: null, accountLabel: 'DeepSeek Account' })
+    expect(columns.map((column) => column.id)).toEqual(['openai', 'deepseek-account'])
+    expect(columns[1].label).toBe('DeepSeek Account')
+    expect(columns[0].models).toHaveLength(2)
+  })
+
+  it('选中态与思考档位数标注', () => {
+    const columns = buildModelColumns({ groups, selection: { provider: 'openai', model: 'gpt-5' }, accountLabel: 'A' })
+    const gpt5 = columns[0].models[0]
+    expect(gpt5.active).toBe(true)
+    expect(gpt5.effortCount).toBe(2)
+    expect(columns[0].models[1].active).toBe(false)
   })
 })

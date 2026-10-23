@@ -19,9 +19,15 @@ export interface Placement {
  * 计算弹层位置：默认挂在锚点下方、左缘对齐锚点左缘；若右侧越界则右缘对齐；
  * 若下方放不下则翻转到锚点上方。
  */
-export function placePopup(rect: AnchorRect, size: { width: number; height: number }, viewport: { width: number; height: number }): Placement {
-  let left = rect.left
+export function placePopup(
+  rect: AnchorRect,
+  size: { width: number; height: number },
+  viewport: { width: number; height: number },
+  align: 'left' | 'right' = 'left'
+): Placement {
+  let left = align === 'right' ? rect.right - size.width : rect.left
   if (left + size.width > viewport.width - 8) left = viewport.width - 8 - size.width
+  if (left < 8) left = align === 'right' ? Math.max(8, rect.right - size.width) : 8
   let top = rect.bottom + 4
   if (top + size.height > viewport.height - 8) top = Math.max(8, rect.top - size.height - 4)
   return { left: Math.round(left), top: Math.round(top) }
