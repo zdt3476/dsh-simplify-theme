@@ -6,7 +6,7 @@
  * 这里只做「取哪几行、怎么归纳」，不碰 DOM，便于单测。
  */
 
-export type DelegationStatus = 'running' | 'done'
+export type DelegationStatus = 'running' | 'done' | 'failed'
 
 export interface DelegationNode {
   id: string
@@ -73,34 +73,4 @@ export function toDelegationNode(id: string, row: SessionRow | undefined, now: n
       return steps === undefined ? {} : { steps }
     })()
   }
-}
-
-/** 当前会话直接委派出去的子代理，按开始的先后排列。 */
-export function collectDelegations(rows: SessionRows, parentId: string | undefined, now = Date.now()): DelegationNode[] {
-  if (parentId === undefined) return []
-  const nodes: DelegationNode[] = []
-  for (const [id, row] of Object.entries(rows)) {
-    if (row === undefined || row.parentId !== parentId) continue
-    const node = toDelegationNode(id, row, now)
-    if (node !== null) nodes.push(node)
-  }
-  return nodes
-}
-
-export interface DelegationSummary {
-  total: number
-  finished: number
-  running: number
-  /** 全部子代理的耗时之和，用于卡片头的总用时。 */
-  durationMs: number
-}
-
-export function summarizeDelegations(nodes: readonly DelegationNode[]): DelegationSummary {
-  let running = 0
-  let durationMs = 0
-  for (const node of nodes) {
-    if (node.status === 'running') running += 1
-    durationMs += node.durationMs ?? 0
-  }
-  return { total: nodes.length, finished: nodes.length - running, running, durationMs }
 }

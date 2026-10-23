@@ -505,7 +505,7 @@ export const UI_CSS = `
 }
 
 /* —— 子代理编排卡片 —— */
-[data-dsh-simplify-delegation-host] { display: block; }
+[data-dsh-simplify-delegations-host] { display: block; margin-top: 8px; }
 
 [data-dsh-simplify-delegations] {
   margin: 0 0 12px;
@@ -626,9 +626,32 @@ export const UI_CSS = `
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 8px 10px;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-md);
+}
+
+[data-dsh-simplify-delegation-node]:hover { border-color: var(--dsw-alias-border-l2); }
+
+[data-dsh-simplify-delegation-open] {
+  appearance: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-dsh-simplify-delegation-open]:hover { background: var(--dsw-alias-interactive-bg-hover); }
+[data-dsh-simplify-delegation-open]:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -1px;
 }
 
 /* 每个子代理左侧的短横线，接出主 Agent 的连接线 */
@@ -675,6 +698,9 @@ export const UI_CSS = `
 
 [data-dsh-simplify-delegation-state][data-status='running'] { color: var(--dsw-alias-state-business-primary); }
 [data-dsh-simplify-delegation-state][data-status='done'] { color: var(--dsw-alias-state-success-primary); }
+[data-dsh-simplify-delegation-state][data-status='failed'] { color: var(--dsw-alias-state-error-primary); }
+[data-dsh-simplify-delegation-icon][data-status='failed'] { background: var(--dsw-alias-state-error-primary); }
+[data-dsh-simplify-delegation-summary][data-failed='true'] { color: var(--dsw-alias-state-error-primary); }
 
 /* —— 回合耗时 —— */
 [data-dsh-simplify-duration] {

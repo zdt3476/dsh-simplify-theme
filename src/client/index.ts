@@ -118,6 +118,9 @@ const DICT_ZH: Record<string, string> = {
   'delegation.finished': '已完成',
   'delegation.state.running': '运行中',
   'delegation.state.done': '已完成',
+  'delegation.state.failed': '失败',
+  'delegation.failed': '{count} 个失败',
+  'delegation.open': '打开子会话',
   'delegation.steps': '{count} 个步骤',
   'duration.ms': '毫秒',
   'duration.s': '秒',
@@ -167,6 +170,9 @@ const DICT_EN: Record<string, string> = {
   'delegation.finished': 'Completed',
   'delegation.state.running': 'Running',
   'delegation.state.done': 'Completed',
+  'delegation.state.failed': 'Failed',
+  'delegation.failed': '{count} failed',
+  'delegation.open': 'Open subagent session',
   'delegation.steps': '{count} steps',
   'duration.ms': 'ms',
   'duration.s': 's',
@@ -327,15 +333,14 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
     const sessions = ctx.sessions?.list
     if (sessions === undefined) return
     const t = withFallback(ctx.locale.bind(PLUGIN_ID), DICT_ZH)
-    const reactModule = require('react') as unknown as { createElement: unknown }
-    const reactDom = require('react-dom/client') as unknown as { createRoot: (c: HTMLElement) => { render: (n: unknown) => void; unmount: () => void } }
     const panel = mountDelegationPanel({
       sessions: sessions as never,
       currentSessionId: () => readCurrentSessionId(localStorage.getItem(CURRENT_SESSION_KEY)),
       locale: t,
-      h: reactModule.createElement as never,
-      hooks: require('react') as never,
-      React: { createRoot: (container) => reactDom.createRoot(container) }
+      openSession: (sessionId: string) => {
+        const service = (ctx as { get?: (name: string) => unknown }).get?.('uiWorkspace') as { openSession?: (id: string) => void } | undefined
+        service?.openSession?.(sessionId)
+      }
     })
     const mount = mountTurnDuration({
       sessions,
