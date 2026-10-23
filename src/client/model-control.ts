@@ -29,6 +29,10 @@ export function createModelControl(props: ModelControlProps) {
       (fn) => directory.store.subscribe(fn),
       () => directory.store.getSnapshot()
     )
+    // 挂载即拉目录：思考等级 pill 与供应商分组不依赖用户先点开弹层。
+    hooks.useEffect(() => {
+      directory.load().catch(() => {})
+    }, [])
     const [open, setOpen] = hooks.useState<'none' | 'model' | 'effort'>('none')
     const [draftEffort, setDraftEffort] = hooks.useState<string | null>(null)
     const triggerRef = hooks.useRef<HTMLElement | null>(null)
@@ -39,7 +43,7 @@ export function createModelControl(props: ModelControlProps) {
     const selection: ModelSelection | null = state.pending ?? state.current
     const name = displayName(groups, selection)
     const group = selection === null ? undefined : groups.find((candidate) => candidate.id === selection.provider)
-    const providerPrefix = group === undefined ? '' : `${group.id === 'deepseek-account' ? t('provider.account') : group.name} · `
+    const providerPrefix = group === undefined ? '' : `${group.id === 'deepseek-account' ? t('provider.account') : group.name} / `
     const effort = effortLabel(groups, selection)
     const busy = state.status === 'selecting' || state.status === 'loading'
 
@@ -48,18 +52,20 @@ export function createModelControl(props: ModelControlProps) {
       setDraftEffort(null)
     }
 
-    // 弹层定位：打开后测量实际尺寸再落位；窗口变化时收起。
+    // 弹层锚定 dock 行（与聊天卡片同宽）的右缘，而不是以按钮为中心：
+    // 宽面板不会因供应商多而溢出屏幕，位置也稳定可预期。
     hooks.useEffect(() => {
       if (open === 'none') {
         setPos(null)
         return
       }
-      const trigger = triggerRef.current
+      const row = triggerRef.current?.closest('[data-composer-dock]') as HTMLElement | null
+      const anchor = row ?? triggerRef.current
       const popup = popupRef.current
-      if (trigger === null || popup === null) return
-      const rect = trigger.getBoundingClientRect()
+      if (anchor === null || popup === null) return
+      const rect = anchor.getBoundingClientRect()
       const size = measurePopup(popup)
-      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }))
+      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }, 'right'))
     }, [open, state.groups.length])
 
     hooks.useEffect(() => {
@@ -182,13 +188,15 @@ export function createModelControl(props: ModelControlProps) {
               const input = event.target as HTMLInputElement
               setDraftEffort(levels[Number(input.value)]?.id ?? null)
             },
-            onPointerUp: () => {
-              if (draftEffort !== null) commitEffort(draftEffort)
+            onPointerUp: (event: Event) => {
+              const level = levels[Number((event.target as HTMLInputElement).value)]
+              if (level !== undefined) commitEffort(level.id)
             },
             onKeyUp: (event: KeyboardEvent) => {
               if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Home' || event.key === 'End') {
                 const input = event.target as HTMLInputElement
-                setDraftEffort(levels[Number(input.value)]?.id ?? null)
+                const level = levels[Number(input.value)]
+                if (level !== undefined) commitEffort(level.id)
               }
             }
           }),

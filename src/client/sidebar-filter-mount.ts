@@ -11,7 +11,7 @@ const SLOT_SELECTOR = '[data-slot="sidebar.workspaces"]'
 
 function findHeader(slot: Element): Element | null {
   const searchButton = slot.querySelector('button[aria-label*="搜索"], button[aria-label*="Search"]')
-  return searchButton?.parentElement?.parentElement ?? null
+  return searchButton?.parentElement?.parentElement?.parentElement ?? null
 }
 
 function listRows(slot: Element): Element[] {
@@ -34,7 +34,7 @@ export function mountSidebarFilter(options: SidebarFilterOptions): SidebarFilter
 
   const host = options.createElement('div')
   host.dataset.dshSimplifyFilterHost = ''
-  header.appendChild(host)
+  header.insertAdjacentElement('afterend', host)
 
   const input = options.createElement('input') as HTMLInputElement
   input.type = 'text'
@@ -46,6 +46,7 @@ export function mountSidebarFilter(options: SidebarFilterOptions): SidebarFilter
   let frame = 0
   const apply = () => {
     frame = 0
+    slot.toggleAttribute('data-dsh-simplify-filtering', input.value.trim() !== '')
     const hidden = computeHiddenRows(listRows(slot as Element).map(readRow), input.value)
     for (const row of listRows(slot as Element)) {
       const key = row.getAttribute('data-row-key') ?? ''
@@ -76,6 +77,7 @@ export function mountSidebarFilter(options: SidebarFilterOptions): SidebarFilter
         row.removeAttribute('data-dsh-simplify-hidden')
         ;(row as HTMLElement).style.display = ''
       }
+      slot.removeAttribute('data-dsh-simplify-filtering')
       host.remove()
     }
   }

@@ -70,11 +70,14 @@ export function displayName(groups: readonly CatalogGroup[], selection: ModelSel
   return model?.name ?? selection.model
 }
 
-/** 当前思考等级的展示名；无元数据返回 undefined。 */
+/**
+ * 当前思考等级的展示名。目录元数据缺失时回落到原始 effort id——原生触发器
+ * 在这种场景也显示 id，这里保持一致，避免思考等级 pill 无声消失。
+ */
 export function effortLabel(groups: readonly CatalogGroup[], selection: ModelSelection | null): string | undefined {
+  if (selection === null) return undefined
   const meta = reasoningFor(groups, selection)
-  if (meta === undefined || meta.efforts === undefined) return undefined
-  const current = selection?.reasoningEffort ?? meta.defaultEffort
+  const current = selection.reasoningEffort ?? meta?.defaultEffort
   if (current === undefined) return undefined
-  return meta.efforts.find((level) => level.id === current)?.name ?? current
+  return meta?.efforts?.find((level) => level.id === current)?.name ?? current
 }

@@ -1,14 +1,19 @@
 /**
- * dock 根控件：把模型、思考等级、权限三颗控件放进 `conversation.composer.dock`。
+ * dock 根控件：把模型、思考等级、权限三颗控件排进 composer 的 dock 行。
  *
- * dock 是 list slot，只在会话态渲染——正好满足「与上下文信息同一行」。
- * 新会话 hero 态保持原生控件（`:has()` 门控的隐藏规则不会生效）。
+ * 两条渲染路径共用同一套控件：
+ * - 会话态：DSH 的 `conversation.composer.dock` list slot 承载（slot 提供标准
+ *   `useProjection` hook 读会话权限投影）。
+ * - 新会话 hero 态：DSH 不渲染该 slot，由 hero-dock 注入容器承载，权限值改为
+ *   轮询读取（见 hero-dock.ts）。
+ *
+ * 布局：权限组靠左、模型组靠右、统计项在中间聚簇（两侧 flex:1 等分）。
  */
 
 import type { ModelDirectories } from './model-directory'
 import { createModelControl } from './model-control'
 import { createPermissionControl } from './permission-control'
-import type { DockShared, H, ReactHooks } from './dock-shared'
+import type { DockShared, H } from './dock-shared'
 
 export interface DockHostProps {
   sessionId: string
@@ -21,20 +26,20 @@ export interface DockHostProps {
 
 export function createDockControl(props: DockHostProps) {
   const model = createModelControl({ sessionId: props.sessionId, directories: props.directories, shared: props.shared })
+  // 组件实例在工厂期创建一次：渲染期重建会丢弹层状态。
   const permission = createPermissionControl({
     sessionId: props.sessionId,
     remote: props.remote,
-    useProjection: props.useProjection,
     session: props.session,
     shared: props.shared
   })
   const h = props.shared.h
 
-  // 两个控件是独立组件：必须作为元素渲染（hooks 才有效），不能直接函数调用。
-  // 布局：权限在左缘，模型(+思考等级)在右缘，dock 行两端对齐。
   return function DockControl() {
+    // slot 路径：标准 hook 读会话权限投影，作为 runtime 值下传。
+    const projection = props.useProjection('permissions')
     return h('div', { 'data-dsh-simplify-dock': '' },
-      h('div', { 'data-dsh-simplify-dock-left': '' }, h(permission as never, {})),
+      h('div', { 'data-dsh-simplify-dock-left': '' }, h(permission as never, { permissionValue: projection?.currentValue })),
       h('div', { 'data-dsh-simplify-dock-right': '' }, h(model as never, {}))
     )
   }

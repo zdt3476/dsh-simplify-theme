@@ -15,6 +15,9 @@ import { SIMPLIFY_TOKENS, THEME_SOURCE } from './tokens'
 import { UI_CSS } from './styles'
 import { mountSidebarTabs } from './sidebar-tabs'
 import { mountSidebarFilter } from './sidebar-filter-mount'
+import { mountSidebarGroups } from './sidebar-groups'
+import { mountHeroDock } from './hero-dock'
+import { readArchivedFilter, VIEW_STORE_KEY } from './view-state'
 import { createDockControl } from './dock-control'
 import type { DockShared, H, ReactHooks } from './dock-shared'
 import type { ModelDirectories } from './model-directory'
@@ -62,6 +65,10 @@ export const inject = ['slots', 'locale', 'modelDirectories', 'remote', 'remote.
 const DICT_ZH: Record<string, string> = {
   'tabs.sessions': '会话',
   'tabs.archived': '已归档',
+  'groups.more': '还有 {count} 个工作区',
+  'groups.collapse': '收起工作区',
+  'groups.pin': '置顶',
+  'groups.pinHint': '选择要置顶的工作区',
   'model.placeholder': '选择模型',
   'model.empty': '暂无可用模型',
   'provider.account': 'DeepSeek 账号',
@@ -81,6 +88,10 @@ const DICT_ZH: Record<string, string> = {
 const DICT_EN: Record<string, string> = {
   'tabs.sessions': 'Sessions',
   'tabs.archived': 'Archived',
+  'groups.more': '{count} more workspaces',
+  'groups.collapse': 'Collapse workspaces',
+  'groups.pin': 'Pin',
+  'groups.pinHint': 'Pick workspaces to pin',
   'model.placeholder': 'Select model',
   'model.empty': 'No models available',
   'provider.account': 'DeepSeek Account',
@@ -180,6 +191,59 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
       if (filterMount === null) filterMount = { unmount: () => {} }
     }
   }, 'simplify-theme: sidebar filter')
+
+  ctx.effect(() => {
+    if (typeof document === 'undefined') return
+    const groupsT = ctx.locale.bind(PLUGIN_ID)
+    let groupsMount: { unmount: () => void } | null = null
+    let attempts = 0
+    const tryMount = () => {
+      if (groupsMount !== null) return
+      groupsMount = mountSidebarGroups({
+        locale: groupsT,
+        createElement: (tag) => document.createElement(tag),
+        archivedFilter: () => readArchivedFilter(localStorage.getItem(VIEW_STORE_KEY))
+      })
+      if (groupsMount === null && attempts < 40) {
+        attempts += 1
+        window.setTimeout(tryMount, 250)
+      }
+    }
+    tryMount()
+    return () => {
+      groupsMount?.unmount()
+      if (groupsMount === null) groupsMount = { unmount: () => {} }
+    }
+  }, 'simplify-theme: sidebar groups')
+
+  ctx.effect(() => {
+    if (typeof document === 'undefined') return
+    const t = ctx.locale.bind(PLUGIN_ID)
+    const reactModule = require('react') as unknown as { createElement: H }
+    const hero = mountHeroDock({
+      directories: ctx.modelDirectories,
+      remote: ctx.remote,
+      sessionOf: (sessionId) => ctx.sessions?.binding(sessionId)?.session,
+      permissionValueOf: (sessionId) => {
+        const session = ctx.sessions?.binding(sessionId)?.session as
+          | { projections?: { values?: () => Record<string, { currentValue?: string }> } }
+          | undefined
+        return session?.projections?.values?.().permissions?.currentValue
+      },
+      shared: {
+        h: reactModule.createElement,
+        hooks: require('react') as unknown as ReactHooks,
+        t: t as (key: string) => string
+      },
+      React: {
+        createRoot: (container: HTMLElement) => {
+          const reactDom = require('react-dom/client') as unknown as { createRoot: (c: HTMLElement) => { render: (n: unknown) => void; unmount: () => void } }
+          return reactDom.createRoot(container)
+        }
+      }
+    })
+    return () => hero?.dispose()
+  }, 'simplify-theme: hero dock')
 }
 
 function registerDock(ctx: ClientCtx): void {
@@ -198,13 +262,6 @@ function registerDock(ctx: ClientCtx): void {
         sessionId,
         directories: ctx.modelDirectories,
         remote: { permissionPresets: { catalog: () => ctx.remote.permissionPresets.catalog() } },
-        useProjection: (key: 'permissions') => {
-          // 会话级 permissions 当前值：session 对象的 projections store。
-          const session = ctx.sessions?.binding?.(sessionId)?.session as
-            | { projections?: { values?: () => Record<string, { currentValue?: string }> } }
-            | undefined
-          return session?.projections?.values?.().permissions as { currentValue: string } | undefined
-        },
         session: () => ctx.sessions?.binding(sessionId)?.session
       })
     },
@@ -216,27 +273,11 @@ function registerDock(ctx: ClientCtx): void {
         useProjection: (key: 'permissions') => { currentValue: string } | undefined
         session: () => PermissionSession | undefined
       }
-      const control = createDockControl({ sessionId, directories, remote, useProjection, session, shared })
-      return control()
-    }
-  ))
-}
-
-function registerModelLabelPrefix(ctx: ClientCtx): void {
-  const react = require('react') as unknown as { createElement: unknown }
-  const labelH = react.createElement as H
-  const labelT = ctx.locale.bind(PLUGIN_ID)
-  ctx.slots.inject('conversation.input.model.label', () => ctx.slots.register(
-    { name: 'conversation.input.model.label', priority: -1 },
-    (props: Record<string, unknown>) => {
-      const { provider, model, placement } = props as {
-        provider: { id: string; name: string }
-        model: { name: string }
-        placement: 'trigger' | 'menu' | 'option'
+      const ref = hooks.useRef<{ sessionId: string; control: ReturnType<typeof createDockControl> } | null>(null)
+      if (ref.current === null || ref.current.sessionId !== sessionId) {
+        ref.current = { sessionId, control: createDockControl({ sessionId, directories, remote, useProjection, session, shared }) }
       }
-      if (placement !== 'trigger') return labelH('span', {}, model.name)
-      const prefix = provider.id === 'deepseek-account' ? labelT('provider.account') : provider.name
-      return labelH('span', {}, `${prefix} · ${model.name}`)
+      return h(ref.current.control as never, {})
     }
   ))
 }
@@ -258,5 +299,4 @@ export function apply(ctx: ClientCtx): void {
   step('styles', () => installStyles(ctx))
   step('tabs', () => mountSidebarTabsSafe(ctx))
   step('dock', () => registerDock(ctx))
-  step('model-label', () => registerModelLabelPrefix(ctx))
 }

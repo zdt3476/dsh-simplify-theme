@@ -19,18 +19,20 @@ export interface PermissionSession {
 export interface PermissionControlProps {
   sessionId: string
   remote: { permissionPresets: { catalog: () => Promise<{ ok: boolean; value?: PermissionCatalog; error?: { code: string; message: string } }> } }
-  /** 会话级 permissions 投影 hook；值形如 { currentValue }。 */
-  useProjection: (key: 'permissions') => { currentValue: string } | undefined
   session: () => PermissionSession | undefined
   shared: DockShared
+}
+
+/** 每次渲染由宿主传入的运行时值（slot 走 hook，hero 走轮询）。 */
+export interface PermissionRuntimeProps {
+  permissionValue?: string
 }
 
 export function createPermissionControl(props: PermissionControlProps) {
   const { h, hooks, t } = props.shared
   const sh = props.shared
 
-  return function PermissionControl() {
-    const projection = props.useProjection('permissions')
+  return function PermissionControl(runtime: PermissionRuntimeProps = {}) {
     const [open, setOpen] = hooks.useState(false)
     const [catalog, setCatalog] = hooks.useState<PermissionCatalog | null>(null)
     const [error, setError] = hooks.useState<string | null>(null)
@@ -63,17 +65,19 @@ export function createPermissionControl(props: PermissionControlProps) {
       }
     }
 
+    // 弹层锚定 dock 行（与聊天卡片同宽）的左缘，与权限 pill 的位置呼应。
     hooks.useEffect(() => {
       if (!open) {
         setPos(null)
         return
       }
-      const trigger = triggerRef.current
+      const row = triggerRef.current?.closest('[data-composer-dock]') as HTMLElement | null
+      const anchor = row ?? triggerRef.current
       const popup = popupRef.current
-      if (trigger === null || popup === null) return
-      const rect = trigger.getBoundingClientRect()
+      if (anchor === null || popup === null) return
+      const rect = anchor.getBoundingClientRect()
       const size = measurePopup(popup)
-      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }))
+      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }, 'left'))
     }, [open, catalog])
 
     hooks.useEffect(() => {
@@ -108,7 +112,7 @@ export function createPermissionControl(props: PermissionControlProps) {
       void submit(preset)
     }
 
-    const current: string | undefined = projection?.currentValue
+    const current: string | undefined = runtime.permissionValue
     const label = current === undefined ? null : presetLabel(current, current, {
       'permission.readOnly': t('permission.readOnly'),
       'permission.workspaceWrite': t('permission.workspaceWrite'),

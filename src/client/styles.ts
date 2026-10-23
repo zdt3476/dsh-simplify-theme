@@ -14,13 +14,10 @@ export const UI_CSS = `
   display: none;
 }
 
-[data-dsh-simplify-dock] {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-  flex: 1 1 100%;
+/* 摊平成行内项：权限组钉左、模型组钉右，中间统计项自然聚簇居中 */
+[data-dsh-simplify-dock],
+[data-dsh-simplify-hero-host] {
+  display: contents;
 }
 
 /* dock 行对齐聊天卡片：复用卡片自身的宽度约束，权限/模型贴卡片左右缘 */
@@ -33,15 +30,9 @@ export const UI_CSS = `
   position: relative;
 }
 
-[data-composer-dock]:has([data-dsh-simplify-dock]) > :not([data-dsh-simplify-dock]):not([data-slot]) {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  pointer-events: auto;
-}
-
-[data-composer-dock]:has([data-dsh-simplify-dock]) > [data-slot='conversation.composer.dock'] > :not([data-dsh-simplify-dock]) {
-  display: none;
+/* 统计项（activity / usage / 上下文表）保持在流内，由两侧 auto margin 挤到中间聚簇 */
+[data-composer-dock]:has([data-dsh-simplify-dock]) [data-composer-stat] {
+  white-space: nowrap;
 }
 
 [data-dsh-simplify-dock-left],
@@ -50,6 +41,19 @@ export const UI_CSS = `
   align-items: center;
   gap: 4px;
   min-width: 0;
+}
+
+/* 两侧等分：中间统计簇才能以卡片中心对齐（不等分时会被宽的一侧挤偏） */
+[data-dsh-simplify-dock-left] {
+  order: -1;
+  flex: 1 1 0;
+  justify-content: flex-start;
+}
+
+[data-dsh-simplify-dock-right] {
+  order: 1;
+  flex: 1 1 0;
+  justify-content: flex-end;
 }
 
 [data-dsh-simplify-pill] {
@@ -123,10 +127,13 @@ export const UI_CSS = `
 /* 模型平铺面板：一供应商一列 */
 [data-dsh-simplify-model-grid] {
   display: flex;
-  align-items: stretch;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
-  min-width: 320px;
-  max-width: min(90vw, 960px);
+  width: min(880px, calc(100vw - 32px));
+  min-width: 0;
+  max-width: calc(100vw - 32px);
   max-height: min(480px, 100vh - 96px);
   padding: 8px;
 }
@@ -134,9 +141,10 @@ export const UI_CSS = `
 [data-dsh-simplify-column] {
   display: flex;
   flex-direction: column;
-  min-width: 180px;
-  max-width: 240px;
-  flex: 1 1 0;
+  box-sizing: border-box;
+  min-width: min(160px, 100%);
+  max-width: 260px;
+  flex: 1 1 170px;
 }
 
 [data-dsh-simplify-column] [data-dsh-simplify-group] {
@@ -153,6 +161,7 @@ export const UI_CSS = `
   gap: 1px;
   overflow-y: auto;
   min-height: 0;
+  max-height: min(320px, 50vh);
 }
 
 [data-dsh-simplify-model-grid] [data-dsh-simplify-item] {
@@ -320,6 +329,7 @@ export const UI_CSS = `
   display: flex;
   min-width: 0;
   flex: 1;
+  padding: 4px 8px;
 }
 
 [data-dsh-simplify-filter] {
@@ -341,5 +351,118 @@ export const UI_CSS = `
 
 [data-dsh-simplify-filter]:focus-visible {
   box-shadow: inset 0 -1px 0 var(--dsw-alias-state-business-primary);
+}
+/* —— 工作区列表：密度 / 徽标 / 折叠 / 置顶 —— */
+[data-slot='sidebar.workspaces'] [data-row-key^='workspace:'],
+[data-slot='sidebar.workspaces'] [data-row-key^='session'] {
+  height: 28px;
+  min-height: 0;
+}
+
+/* 折叠：超出前 N 的组整组隐藏 */
+[data-dsh-simplify-collapsed] {
+  display: none;
+}
+[data-slot='sidebar.workspaces'][data-dsh-simplify-filtering] [data-dsh-simplify-collapsed] {
+  display: block;
+}
+
+/* 置顶：列表容器改 flex 列，置顶组提前（只改顺序，不动 DOM） */
+[data-slot='sidebar.workspaces'] *:has(> [data-dsh-simplify-group]) {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-dsh-simplify-group][data-dsh-simplify-pinned] {
+  order: -100;
+}
+
+/* 会话数徽标：挂在工作区行末尾的 pseudo 元素上 */
+[data-slot='sidebar.workspaces'] [data-row-key^='workspace:'][data-dsh-simplify-count]::after {
+  content: attr(data-dsh-simplify-count);
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-caption);
+}
+
+/* 折叠/置顶控件 */
+[data-dsh-simplify-groups-controls] {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  min-width: 0;
+}
+
+[data-dsh-simplify-groups-toggle],
+[data-dsh-simplify-pin-toggle] {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 16px;
+  padding: 2px 6px;
+  border-radius: var(--dsw-radius-sm);
+  white-space: nowrap;
+}
+
+[data-dsh-simplify-groups-toggle]:hover,
+[data-dsh-simplify-pin-toggle]:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+[data-dsh-simplify-groups-toggle][hidden] {
+  display: none;
+}
+
+[data-dsh-simplify-pin-panel] {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1100;
+  min-width: 180px;
+  max-width: 240px;
+  max-height: 280px;
+  overflow: auto;
+  padding: 4px;
+  background: var(--dsw-alias-bg-layer-2);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  box-shadow: var(--dsw-elevation-panel);
+}
+
+[data-dsh-simplify-pin-panel][hidden] {
+  display: none;
+}
+
+[data-dsh-simplify-pin-item] {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  line-height: 18px;
+  padding: 4px 6px;
+  border-radius: var(--dsw-radius-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-dsh-simplify-pin-item]:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+[data-dsh-simplify-pin-item][data-active='true'] {
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
 }
 `

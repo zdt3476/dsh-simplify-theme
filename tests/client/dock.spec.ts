@@ -6,6 +6,8 @@ import { placePopup } from '../../src/client/popup'
 import { readArchivedFilter } from '../../src/client/view-state'
 import { presetLabel, CONFIRM_PRESETS } from '../../src/client/permission-catalog'
 import { buildModelColumns } from '../../src/client/model-control'
+import { hiddenCount, parsePinned, visibleGroupIds } from '../../src/client/sidebar-groups'
+import { readCurrentSessionId, shouldInjectHeroDock } from '../../src/client/hero-dock'
 
 describe('model directory helpers', () => {
   const groups = [
@@ -146,5 +148,54 @@ describe('model grid columns', () => {
     expect(gpt5.active).toBe(true)
     expect(gpt5.effortCount).toBe(2)
     expect(columns[0].models[1].active).toBe(false)
+  })
+})
+
+describe('sidebar groups', () => {
+  const groups = [
+    { id: 'a', pinned: false },
+    { id: 'b', pinned: false },
+    { id: 'c', pinned: false },
+    { id: 'd', pinned: false },
+    { id: 'e', pinned: false },
+    { id: 'f', pinned: false },
+    { id: 'deep', pinned: true }
+  ]
+
+  it('只保留前 N 个非置顶组，置顶组始终可见', () => {
+    const visible = visibleGroupIds(groups, 3)
+    expect([...visible].sort()).toEqual(['a', 'b', 'c', 'deep'])
+    expect(hiddenCount(groups, 3)).toBe(3)
+  })
+
+  it('置顶不占用普通组额度', () => {
+    const visible = visibleGroupIds(groups, 5)
+    expect(visible.has('deep')).toBe(true)
+    expect(visible.size).toBe(6)
+    expect(hiddenCount(groups, 5)).toBe(1)
+  })
+
+  it('置顶列表解析容错', () => {
+    expect(parsePinned('["a","b"]')).toEqual(['a', 'b'])
+    expect(parsePinned('nope')).toEqual([])
+    expect(parsePinned(null)).toEqual([])
+    expect(parsePinned('[1,null,"x"]')).toEqual(['x'])
+  })
+})
+
+describe('hero dock helpers', () => {
+  it('仅在没有 slot、存在 dock 行时注入', () => {
+    expect(shouldInjectHeroDock({ hasRow: true, hasSlot: false, hasHost: false })).toBe(true)
+    expect(shouldInjectHeroDock({ hasRow: true, hasSlot: true, hasHost: false })).toBe(false)
+    expect(shouldInjectHeroDock({ hasRow: true, hasSlot: false, hasHost: true })).toBe(false)
+    expect(shouldInjectHeroDock({ hasRow: false, hasSlot: false, hasHost: false })).toBe(false)
+  })
+
+  it('当前会话 id 解析容错', () => {
+    expect(readCurrentSessionId('{"sessionId":"session-1"}')).toBe('session-1')
+    expect(readCurrentSessionId('{"sessionId":""}')).toBeUndefined()
+    expect(readCurrentSessionId('{}')).toBeUndefined()
+    expect(readCurrentSessionId('bad')).toBeUndefined()
+    expect(readCurrentSessionId(null)).toBeUndefined()
   })
 })

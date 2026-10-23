@@ -38,11 +38,6 @@ export function placePopup(
 
 /** 测量一个已插入 DOM（visibility 隐藏）的弹层尺寸。 */
 export function measurePopup(popup: HTMLElement): { width: number; height: number } {
-  const previous = popup.style.visibility
-  popup.style.visibility = 'hidden'
-  popup.style.display = 'block'
   const rect = popup.getBoundingClientRect()
-  popup.style.display = ''
-  popup.style.visibility = previous
   return { width: rect.width, height: rect.height }
 }
