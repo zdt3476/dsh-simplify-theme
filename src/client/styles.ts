@@ -373,10 +373,6 @@ export const UI_CSS = `
   flex-direction: column;
 }
 
-[data-dsh-simplify-group][data-dsh-simplify-pinned] {
-  order: -100;
-}
-
 /* 会话数徽标：挂在工作区行末尾的 pseudo 元素上 */
 [data-slot='sidebar.workspaces'] [data-row-key^='workspace:'][data-dsh-simplify-count]::after {
   content: attr(data-dsh-simplify-count);

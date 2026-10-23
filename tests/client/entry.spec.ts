@@ -36,7 +36,7 @@ function makeCtx() {
 describe('client entry', () => {
   it('声明插件身份并依赖 slots/locale/modelDirectories/remote/theme', () => {
     expect(name).toBe('dsh-simplify-theme')
-    for (const service of ['slots', 'locale', 'modelDirectories', 'remote', 'theme']) {
+    for (const service of ['slots', 'locale', 'modelDirectories', 'remote', 'sessions', 'workspaces', 'theme']) {
       expect(inject).toContain(service)
     }
   })

@@ -16,6 +16,7 @@ import { UI_CSS } from './styles'
 import { mountSidebarTabs } from './sidebar-tabs'
 import { mountSidebarFilter } from './sidebar-filter-mount'
 import { mountSidebarGroups } from './sidebar-groups'
+import type { ActivityStore, SessionActivitySnapshot, WorkspaceActivitySnapshot } from './sidebar-activity'
 import { mountHeroDock } from './hero-dock'
 import { readArchivedFilter, VIEW_STORE_KEY } from './view-state'
 import { createDockControl } from './dock-control'
@@ -36,6 +37,7 @@ interface SlotRegistry {
 }
 
 interface SessionsService {
+  list: ActivityStore<SessionActivitySnapshot>
   binding: (sessionId: string) => { session?: PermissionSession } | undefined
   scope?: (sessionId: string) => unknown
 }
@@ -45,6 +47,7 @@ interface ClientCtx {
   locale: LocaleService
   effect: (fn: () => void | (() => void), name?: string) => void
   sessions?: SessionsService
+  workspaces?: { list: ActivityStore<WorkspaceActivitySnapshot> }
   inject: (services: string[], callback: (scope: Record<string, unknown>) => void) => void
   get?: (name: string) => unknown
   modelDirectories: ModelDirectories
@@ -60,7 +63,7 @@ interface ClientCtx {
 }
 
 export const name = PLUGIN_ID
-export const inject = ['slots', 'locale', 'modelDirectories', 'remote', 'remote.permissionPresets', 'sessions', 'theme']
+export const inject = ['slots', 'locale', 'modelDirectories', 'remote', 'remote.permissionPresets', 'sessions', 'workspaces', 'theme']
 
 const DICT_ZH: Record<string, string> = {
   'tabs.sessions': '会话',
@@ -195,12 +198,17 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
   ctx.effect(() => {
     if (typeof document === 'undefined') return
     const groupsT = ctx.locale.bind(PLUGIN_ID)
+    const workspaces = ctx.workspaces?.list
+    const sessions = ctx.sessions?.list
+    if (workspaces === undefined || sessions === undefined) throw new Error('sidebar activity stores unavailable')
     let groupsMount: { unmount: () => void } | null = null
     let attempts = 0
     const tryMount = () => {
       if (groupsMount !== null) return
       groupsMount = mountSidebarGroups({
         locale: groupsT,
+        workspaces,
+        sessions,
         createElement: (tag) => document.createElement(tag),
         archivedFilter: () => readArchivedFilter(localStorage.getItem(VIEW_STORE_KEY))
       })

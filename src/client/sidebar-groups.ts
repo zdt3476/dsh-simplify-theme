@@ -1,5 +1,5 @@
 /**
- * 侧栏工作区列表的渐进披露：折叠、置顶、会话数徽标。
+ * 侧栏工作区列表的渐进披露：活跃排序、折叠、置顶、会话数徽标。
  *
  * DSH 没有工作区级的 pin，也没有「只显示前 N 个工作区」的开关，所以全部在
  * DOM 层做（与 tabs/筛选同一套注入策略）：
@@ -10,6 +10,8 @@
  */
 
 import type { ArchivedFilter } from './view-state'
+import { orderWorkspaceGroups, workspaceActivity } from './sidebar-activity'
+import type { ActivityStore, SessionActivitySnapshot, WorkspaceActivitySnapshot } from './sidebar-activity'
 
 export const PINNED_KEY = 'dsh-simplify-theme.pinned-workspaces'
 export const EXPANDED_KEY = 'dsh-simplify-theme.workspaces-expanded'
@@ -32,7 +34,7 @@ export function parsePinned(raw: string | null): string[] {
 }
 
 /**
- * 折叠后应保持可见的组：置顶始终可见，其余按原顺序取前 `limit` 个。
+ * 折叠后应保持可见的组：置顶始终可见，其余取排序后的前 `limit` 个。
  */
 export function visibleGroupIds(groups: readonly GroupInfo[], limit = COLLAPSED_LIMIT): Set<string> {
   const visible = new Set<string>()
@@ -61,6 +63,8 @@ export interface SidebarGroupsOptions {
   createElement: (tag: string) => HTMLElement
   /** 读取当前归档过滤，归档页不做折叠（否则「已归档」页会空）。 */
   archivedFilter: () => ArchivedFilter
+  workspaces: ActivityStore<WorkspaceActivitySnapshot>
+  sessions: ActivityStore<SessionActivitySnapshot>
 }
 
 export interface SidebarGroupsMount {
@@ -142,6 +146,7 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
     }
   }
 
+  const originalOrders = new WeakMap<HTMLElement, string>()
   let frame = 0
   const apply = () => {
     frame = 0
@@ -157,12 +162,17 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
       group.row.setAttribute('title', `当前列表可见 ${count} 个会话`)
     }
 
-    const visible = visibleGroupIds(groups.map((group) => ({ id: group.id, pinned: pinned.has(group.id) })))
-    for (const group of groups) {
+    const workspace = options.workspaces.getSnapshot()
+    const activity = workspaceActivity(workspace.items, options.sessions.getSnapshot().byId, workspace.archivedSessionIds, archived)
+    const ranked = orderWorkspaceGroups(groups.map(group => ({ ...group, pinned: pinned.has(group.id) })), activity)
+    const visible = visibleGroupIds(ranked)
+    for (const [index, group] of ranked.entries()) {
+      if (!originalOrders.has(group.element)) originalOrders.set(group.element, group.element.style.order)
+      group.element.style.order = String(index - ranked.length)
       group.element.toggleAttribute('data-dsh-simplify-collapsed', collapse && !visible.has(group.id))
     }
 
-    const hidden = hiddenCount(groups.map((group) => ({ id: group.id, pinned: pinned.has(group.id) })))
+    const hidden = hiddenCount(ranked)
     toggle.hidden = hidden === 0 && !expanded
     const label = expanded
       ? options.locale('groups.collapse')
@@ -204,14 +214,20 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
 
   const observer = new MutationObserver(schedule)
   observer.observe(slot, { childList: true, subtree: true })
+  const unsubscribeWorkspaces = options.workspaces.subscribe(schedule)
+  const unsubscribeSessions = options.sessions.subscribe(schedule)
   schedule()
 
   return {
     unmount: () => {
       observer.disconnect()
+      unsubscribeWorkspaces()
+      unsubscribeSessions()
       document.removeEventListener('pointerdown', closeOnOutside, true)
       if (frame !== 0) window.cancelAnimationFrame(frame)
       for (const group of collectGroups(slot)) {
+        const order = originalOrders.get(group.element)
+        if (order !== undefined) group.element.style.order = order
         group.element.removeAttribute('data-dsh-simplify-group')
         group.element.removeAttribute('data-dsh-simplify-pinned')
         group.element.removeAttribute('data-dsh-simplify-collapsed')
