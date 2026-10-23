@@ -43,6 +43,10 @@ export const UI_CSS = `
   min-width: 0;
 }
 
+/* 控件不贴行边：与卡片内 + 按钮的缩进保持一致，避免看起来挤在桌角 */
+[data-dsh-simplify-dock-left] { padding-left: 6px; }
+[data-dsh-simplify-dock-right] { padding-right: 6px; }
+
 /* 两侧等分：中间统计簇才能以卡片中心对齐（不等分时会被宽的一侧挤偏） */
 [data-dsh-simplify-dock-left] {
   order: -1;
@@ -498,6 +502,16 @@ export const UI_CSS = `
 [data-dsh-simplify-effort-scale] > span[data-active='true'] {
   color: var(--dsw-alias-state-business-primary);
   font-weight: 600;
+}
+
+/* —— 回合耗时 —— */
+[data-dsh-simplify-duration] {
+  flex: none;
+  margin-left: 2px;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
 }
 
 /* —— dock 统计项的百分比配色 —— */

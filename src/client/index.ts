@@ -19,6 +19,8 @@ import { mountSidebarGroups } from './sidebar-groups'
 import type { ActivityStore, SessionActivitySnapshot, WorkspaceActivitySnapshot } from './sidebar-activity'
 import { mountHeroDock } from './hero-dock'
 import { mountStatColors } from './stat-colors-mount'
+import { mountTurnDuration } from './turn-duration'
+import { CURRENT_SESSION_KEY, readCurrentSessionId } from './hero-dock'
 import { readArchivedFilter, VIEW_STORE_KEY } from './view-state'
 import { withFallback } from './locale-fallback'
 import { createDockControl } from './dock-control'
@@ -103,6 +105,10 @@ const DICT_ZH: Record<string, string> = {
   'permission.confirmTitle': '此模式将减少确认步骤，确认继续？',
   'permission.confirmEnable': '我已了解风险，继续启用',
   'permission.cancel': '取消',
+  'duration.took': '耗时',
+  'duration.ms': '毫秒',
+  'duration.s': '秒',
+  'duration.m': '分',
   'error.load': '加载失败',
   'error.session': '会话尚未就绪'
 }
@@ -140,6 +146,10 @@ const DICT_EN: Record<string, string> = {
   'permission.confirmTitle': 'This mode reduces confirmation steps. Continue?',
   'permission.confirmEnable': 'I understand the risk, continue',
   'permission.cancel': 'Cancel',
+  'duration.took': 'took',
+  'duration.ms': 'ms',
+  'duration.s': 's',
+  'duration.m': 'm',
   'error.load': 'Load failed',
   'error.session': 'Session is not ready'
 }
@@ -291,6 +301,18 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
     const mount = mountStatColors()
     return () => mount?.unmount()
   }, 'simplify-theme: stat colors')
+
+  ctx.effect(() => {
+    const sessions = ctx.sessions?.list
+    if (sessions === undefined) return
+    const t = withFallback(ctx.locale.bind(PLUGIN_ID), DICT_ZH)
+    const mount = mountTurnDuration({
+      sessions,
+      currentSessionId: () => readCurrentSessionId(localStorage.getItem(CURRENT_SESSION_KEY)),
+      locale: t
+    })
+    return () => mount?.unmount()
+  }, 'simplify-theme: turn duration')
 }
 
 function registerDock(ctx: ClientCtx): void {

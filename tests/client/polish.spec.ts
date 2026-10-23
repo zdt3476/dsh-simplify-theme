@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { classifyPercent, readPercent } from '../../src/client/stat-colors'
 import { withFallback } from '../../src/client/locale-fallback'
+import { formatTurnDuration } from '../../src/client/turn-duration'
 
 describe('percent coloring', () => {
   it('从文案中取百分比', () => {
@@ -37,5 +38,16 @@ describe('locale fallback', () => {
   it('内置字典也没有时返回原值', () => {
     const t = withFallback((key) => key, dict)
     expect(t('unknown.key')).toBe('unknown.key')
+  })
+})
+
+describe('turn duration formatting', () => {
+  const locale = (key: string) => ({ 'duration.ms': '毫秒', 'duration.s': '秒', 'duration.m': '分' }[key] ?? key)
+
+  it('毫秒、秒、分钟三档', () => {
+    expect(formatTurnDuration(620, locale)).toBe('620 毫秒')
+    expect(formatTurnDuration(12_340, locale)).toBe('12.3 秒')
+    expect(formatTurnDuration(60_000, locale)).toBe('1 分')
+    expect(formatTurnDuration(95_000, locale)).toBe('1 分 35 秒')
   })
 })
