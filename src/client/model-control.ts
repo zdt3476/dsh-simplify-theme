@@ -9,6 +9,7 @@
 
 import type { ModelDirectories, ModelSelection, CatalogGroup } from './model-directory'
 import { effortLabel, effortLevels, displayName, orderGroups } from './model-directory'
+import { effortName, providerName } from './localize'
 import { placePopup, measurePopup } from './popup'
 import { useDismiss } from './dock-shared'
 import type { DockShared } from './dock-shared'
@@ -43,7 +44,7 @@ export function createModelControl(props: ModelControlProps) {
     const selection: ModelSelection | null = state.pending ?? state.current
     const name = displayName(groups, selection)
     const group = selection === null ? undefined : groups.find((candidate) => candidate.id === selection.provider)
-    const providerPrefix = group === undefined ? '' : `${group.id === 'deepseek-account' ? t('provider.account') : group.name} / `
+    const providerPrefix = group === undefined ? '' : `${providerName(group.id, group.name)} / `
     const effort = effortLabel(groups, selection, t('effort.providerDefault'), state.retainedEffort)
     const busy = state.status === 'selecting' || state.status === 'loading'
 
@@ -52,7 +53,7 @@ export function createModelControl(props: ModelControlProps) {
       setDraftEffort(null)
     }
 
-    // 弹层锚定 dock 行（与聊天卡片同宽）的右缘，而不是以按钮为中心：
+    // 弹层锚定 dock 行（与聊天卡片同宽）的左缘，与控件所在侧一致：
     // 宽面板不会因供应商多而溢出屏幕，位置也稳定可预期。
     hooks.useEffect(() => {
       if (open === 'none') {
@@ -65,7 +66,7 @@ export function createModelControl(props: ModelControlProps) {
       if (anchor === null || popup === null) return
       const rect = anchor.getBoundingClientRect()
       const size = measurePopup(popup)
-      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }, 'right'))
+      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }, 'left'))
     }, [open, state.groups.length])
 
     hooks.useEffect(() => {
@@ -98,6 +99,7 @@ export function createModelControl(props: ModelControlProps) {
         type: 'button',
         'data-dsh-simplify-pill': '',
         'data-dsh-simplify-control': kind,
+        'data-dsh-simplify-emphasis': kind,
         'aria-label': kind === 'effort' ? `${t('effort.title')}：${effort ?? t('effort.unavailableShort')}` : undefined,
         'aria-haspopup': 'dialog',
         'aria-expanded': open === kind ? 'true' : 'false',
@@ -110,7 +112,10 @@ export function createModelControl(props: ModelControlProps) {
           if (kind === 'model') openDirectory()
           else setOpen((prev) => (prev === 'effort' ? 'none' : 'effort'))
         }
-      }, label)
+      },
+      h('span', { 'data-dsh-simplify-pill-glyph': '', 'aria-hidden': 'true' }),
+      label,
+      h('span', { 'data-dsh-simplify-pill-caret': '', 'aria-hidden': 'true' }))
 
     const children: unknown[] = [
       pill('model', name === '' ? t('model.placeholder') : h('span', { 'data-dsh-simplify-pill-label': '' }, providerPrefix + name))
@@ -148,7 +153,7 @@ export function createModelControl(props: ModelControlProps) {
         }
         columns.push(
           h('div', { 'data-dsh-simplify-column': '', key: `g:${group.id}` },
-            h('div', { 'data-dsh-simplify-group': '' }, group.id === 'deepseek-account' ? t('provider.account') : group.name),
+            h('div', { 'data-dsh-simplify-group': '' }, providerName(group.id, group.name)),
             h('div', { 'data-dsh-simplify-column-body': '' }, models)
           )
         )
@@ -161,7 +166,7 @@ export function createModelControl(props: ModelControlProps) {
       }, columns))
     }
 
-    // 思考等级滑块
+    // 思考等级滑块：标题行给出当前档位，轨道带填充进度，刻度文字标出全部档位。
     if (open === 'effort') {
       const meta = groups.find((candidate) => candidate.id === selection?.provider)?.models.find((candidate) => candidate.id === selection?.model)?.reasoning
       const levels = effortLevels(meta, t('effort.providerDefault'))
@@ -169,7 +174,9 @@ export function createModelControl(props: ModelControlProps) {
         children.push(h('div', { 'data-dsh-simplify-popup': '', ref: (el: HTMLElement | null) => { popupRef.current = el }, style: pos === null ? { visibility: 'hidden' } : { left: pos.left, top: pos.top } }, h('div', { 'data-dsh-simplify-note': '' }, t('effort.unavailable'))))
       } else {
         const currentId = draftEffort === null ? selection?.reasoningEffort ?? meta?.defaultEffort : draftEffort || undefined
-        const index = Math.max(0, levels.findIndex((level) => level.id === currentId))
+        const draftIndex = draftEffort === null ? -1 : levels.findIndex((level) => (level.id ?? '') === draftEffort)
+        const index = draftIndex >= 0 ? draftIndex : Math.max(0, levels.findIndex((level) => level.id === currentId))
+        const fill = levels.length > 1 ? (index / (levels.length - 1)) * 100 : 100
         children.push(
           h('div', {
             'data-dsh-simplify-popup': '',
@@ -177,34 +184,43 @@ export function createModelControl(props: ModelControlProps) {
             ref: (el: HTMLElement | null) => { popupRef.current = el },
             style: pos === null ? { visibility: 'hidden' } : { left: pos.left, top: pos.top }
           },
-          h('div', { 'data-dsh-simplify-effort-title': '' }, t('effort.title')),
-          h('input', {
-            type: 'range',
-            'aria-label': t('effort.title'),
-            'aria-valuetext': levels[index]?.name,
-            'data-dsh-simplify-effort-slider': '',
-            min: 0,
-            max: levels.length - 1,
-            step: 1,
-            value: index,
-            onChange: (event: Event) => {
-              const input = event.target as HTMLInputElement
-              setDraftEffort(levels[Number(input.value)]?.id ?? '')
-            },
-            onPointerUp: (event: Event) => {
-              const level = levels[Number((event.target as HTMLInputElement).value)]
-              if (level !== undefined) commitEffort(level.id)
-            },
-            onKeyUp: (event: KeyboardEvent) => {
-              if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Home' || event.key === 'End') {
+          h('div', { 'data-dsh-simplify-effort-head': '' },
+            h('span', { 'data-dsh-simplify-effort-title': '' }, t('effort.title')),
+            h('span', { 'data-dsh-simplify-effort-value': '' }, levels[index]?.name ?? '')
+          ),
+          h('div', { 'data-dsh-simplify-effort-rail': '', style: { '--dsh-simplify-fill': `${fill}%` } },
+            h('input', {
+              type: 'range',
+              'aria-label': t('effort.title'),
+              'aria-valuetext': levels[index]?.name,
+              'data-dsh-simplify-effort-slider': '',
+              min: 0,
+              max: levels.length - 1,
+              step: 1,
+              value: index,
+              onChange: (event: Event) => {
                 const input = event.target as HTMLInputElement
-                const level = levels[Number(input.value)]
+                setDraftEffort(levels[Number(input.value)]?.id ?? '')
+              },
+              onPointerUp: (event: Event) => {
+                const level = levels[Number((event.target as HTMLInputElement).value)]
                 if (level !== undefined) commitEffort(level.id)
+              },
+              onKeyUp: (event: KeyboardEvent) => {
+                if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'Home' || event.key === 'End') {
+                  const input = event.target as HTMLInputElement
+                  const level = levels[Number(input.value)]
+                  if (level !== undefined) commitEffort(level.id)
+                }
               }
-            }
-          }),
-          h('div', { 'data-dsh-simplify-effort-scale': '' }, levels.map((level) => h('span', { key: level.id ?? 'provider-default' }, level.name)))
-        )
+            })
+          ),
+          h('div', { 'data-dsh-simplify-effort-scale': '' }, levels.map((level, levelIndex) =>
+            h('span', {
+              key: level.id ?? 'provider-default',
+              'data-active': levelIndex === index ? 'true' : 'false'
+            }, level.name)))
+          )
         )
       }
     }

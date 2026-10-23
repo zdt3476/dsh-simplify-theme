@@ -4,7 +4,7 @@ import { computeHiddenRows, readRow } from '../../src/client/sidebar-filter'
 import { tabLabels } from '../../src/client/sidebar-tabs'
 import { placePopup } from '../../src/client/popup'
 import { readArchivedFilter } from '../../src/client/view-state'
-import { presetLabel, CONFIRM_PRESETS } from '../../src/client/permission-catalog'
+import { presetLabel, permissionRisk, CONFIRM_PRESETS } from '../../src/client/permission-catalog'
 import { buildModelColumns } from '../../src/client/model-control'
 import { hiddenCount, parsePinned, visibleGroupIds } from '../../src/client/sidebar-groups'
 import { readCurrentSessionId, shouldInjectHeroDock } from '../../src/client/hero-dock'
@@ -38,7 +38,7 @@ describe('model directory helpers', () => {
     expect(effortLevels({ efforts: levels, defaultEffort: 'high' }, '默认')).toEqual(levels)
     expect(effortLevels(undefined, '默认')).toEqual([])
     expect(effortLevels({ efforts: [] }, '默认')).toEqual([])
-    expect(effortLabel([], { provider: 'x', model: 'm' }, '默认', 'high')).toBe('high')
+    expect(effortLabel([], { provider: 'x', model: 'm' }, '默认', 'high')).toBe('高')
   })
 
   it('目录丢失时展示名回落到模型 id', () => {
@@ -131,6 +131,15 @@ describe('permission labels', () => {
     expect(presetLabel('read-only', 'read-only', labels)).toBe('仅可查看')
     expect(presetLabel('custom-preset', 'custom-preset', labels)).toBe('Custom Preset')
     expect(presetLabel('my-label', 'My Label', labels)).toBe('My Label')
+    expect(presetLabel('auto', 'auto', { ...labels, 'permission.auto': '自动审查' })).toBe('自动审查')
+  })
+
+  it('权限风险等级用于着色', () => {
+    expect(permissionRisk('read-only')).toBe('safe')
+    expect(permissionRisk('workspace-write')).toBe('normal')
+    expect(permissionRisk('danger-full-access')).toBe('danger')
+    expect(permissionRisk('auto')).toBe('experimental')
+    expect(permissionRisk('host-custom')).toBe('normal')
   })
 
   it('高危预设集合包含完全权限与自动审查', () => {

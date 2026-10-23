@@ -56,17 +56,18 @@ export const UI_CSS = `
   justify-content: flex-end;
 }
 
+/* 参考主流选择器：浅底 + 发丝边 + 品牌色图标点，展开时换成品牌色描边。 */
 [data-dsh-simplify-pill] {
   appearance: none;
-  border: none;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  gap: 6px;
   height: 24px;
-  padding: 0 6px;
+  padding: 0 8px;
   border-radius: var(--dsw-radius-sm);
   font-size: 12px;
   line-height: 16px;
@@ -75,7 +76,13 @@ export const UI_CSS = `
 }
 
 [data-dsh-simplify-pill]:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: var(--dsw-alias-interactive-bg-active);
+  border-color: var(--dsw-alias-border-l2);
+}
+
+[data-dsh-simplify-pill][aria-expanded='true'] {
+  border-color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-interactive-bg-hover-accent);
 }
 
 [data-dsh-simplify-pill]:disabled {
@@ -88,6 +95,50 @@ export const UI_CSS = `
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+[data-dsh-simplify-pill-glyph] {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-business-primary);
+}
+
+/* 权限按风险等级着色：只读=安全、工作区=常规、完全权限=危险、自动审查=实验 */
+[data-dsh-simplify-control='permission'][data-dsh-simplify-risk='safe'] [data-dsh-simplify-pill-glyph] {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+[data-dsh-simplify-control='permission'][data-dsh-simplify-risk='danger'] {
+  border-color: var(--dsw-alias-state-error-secondary);
+  color: var(--dsw-alias-label-error);
+}
+
+[data-dsh-simplify-control='permission'][data-dsh-simplify-risk='danger'] [data-dsh-simplify-pill-glyph] {
+  background: var(--dsw-alias-state-error-primary);
+}
+
+[data-dsh-simplify-control='permission'][data-dsh-simplify-risk='experimental'] {
+  border-color: var(--dsw-alias-state-warn-secondary);
+}
+
+[data-dsh-simplify-control='permission'][data-dsh-simplify-risk='experimental'] [data-dsh-simplify-pill-glyph] {
+  background: var(--dsw-alias-state-warn-primary);
+}
+
+[data-dsh-simplify-pill-caret] {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 4px solid var(--dsw-alias-label-caption);
+  transition: transform 0.12s ease;
+}
+
+[data-dsh-simplify-pill][aria-expanded='true'] [data-dsh-simplify-pill-caret] {
+  transform: rotate(180deg);
 }
 
 /* —— 弹层 —— */
@@ -220,30 +271,173 @@ export const UI_CSS = `
   color: var(--dsw-alias-state-error-primary);
 }
 
+/* 弹层内的选中项：品牌色左侧条 + 品牌色勾选，与浅底 hover 区分 */
+[data-dsh-simplify-popup] button[data-dsh-simplify-item][data-active='true'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, transparent);
+  box-shadow: inset 2px 0 0 var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-label-primary);
+}
+
+[data-dsh-simplify-check] {
+  flex: none;
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 12px;
+}
+
+[data-dsh-simplify-risk-dot] {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-quaternary);
+}
+
+[data-dsh-simplify-item][data-dsh-simplify-risk='safe'] [data-dsh-simplify-risk-dot] {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+[data-dsh-simplify-item][data-dsh-simplify-risk='danger'] [data-dsh-simplify-risk-dot] {
+  background: var(--dsw-alias-state-error-primary);
+}
+
+[data-dsh-simplify-item][data-dsh-simplify-risk='experimental'] [data-dsh-simplify-risk-dot] {
+  background: var(--dsw-alias-state-warn-primary);
+}
+
 /* —— 思考等级滑块 —— */
 [data-dsh-simplify-effort] {
-  padding: 8px 10px 6px;
-  min-width: 220px;
+  --dsh-simplify-fill: 0%;
+  padding: 10px 14px 8px;
+  min-width: 260px;
+}
+
+[data-dsh-simplify-effort-head] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 [data-dsh-simplify-effort-title] {
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+[data-dsh-simplify-effort-value] {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 14%, transparent);
+  color: var(--dsw-alias-state-business-primary);
   font-size: 11px;
-  color: var(--dsw-alias-label-tertiary);
-  margin-bottom: 6px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+[data-dsh-simplify-effort-rail] {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 22px;
 }
 
 [data-dsh-simplify-effort-slider] {
+  appearance: none;
   width: 100%;
-  accent-color: var(--dsw-alias-state-business-primary);
+  height: 22px;
   margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+[data-dsh-simplify-effort-slider]:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* 轨道：已选区间用品牌色填充，剩余区间用底色 */
+[data-dsh-simplify-effort-slider]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--dsw-alias-state-business-primary) 0 var(--dsh-simplify-fill),
+    var(--dsw-alias-border-l2) var(--dsh-simplify-fill) 100%
+  );
+}
+
+[data-dsh-simplify-effort-slider]::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-border-l2);
+}
+
+[data-dsh-simplify-effort-slider]::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-business-primary);
+}
+
+[data-dsh-simplify-effort-slider]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-layer-2);
+  border: 2px solid var(--dsw-alias-state-business-primary);
+  box-sizing: border-box;
+}
+
+[data-dsh-simplify-effort-slider]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-layer-2);
+  border: 2px solid var(--dsw-alias-state-business-primary);
+  box-sizing: border-box;
 }
 
 [data-dsh-simplify-effort-scale] {
   display: flex;
   justify-content: space-between;
+  gap: 4px;
+  margin-top: 8px;
   font-size: 11px;
   color: var(--dsw-alias-label-caption);
-  margin-top: 2px;
+}
+
+[data-dsh-simplify-effort-scale] > span {
+  flex: 1 1 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-dsh-simplify-effort-scale] > span[data-active='true'] {
+  color: var(--dsw-alias-state-business-primary);
+  font-weight: 600;
+}
+
+/* —— dock 统计项的百分比配色 —— */
+[data-dsh-simplify-pct='good'] {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+[data-dsh-simplify-pct='warn'] {
+  color: var(--dsw-alias-state-warn-label);
+}
+
+[data-dsh-simplify-pct='bad'] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+/* 上下文环：文字配色之外同步描边，避免出现「彩色数字 + 灰环」 */
+[data-dsh-simplify-pct][data-dsh-simplify-pct-kind='context'] svg *[class*='fill'] {
+  stroke: currentColor;
 }
 
 /* —— 侧栏归档 tabs —— */

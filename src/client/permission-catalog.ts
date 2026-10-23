@@ -30,15 +30,28 @@ export interface PermissionCatalogStore {
   getSnapshot: () => { value: PermissionCatalog | null }
 }
 
+/** 内置预设的本地化键，顺序即风险等级。 */
+const PRESET_KEYS: Record<string, string> = {
+  'read-only': 'permission.readOnly',
+  'workspace-write': 'permission.workspaceWrite',
+  'danger-full-access': 'permission.fullAccess',
+  auto: 'permission.auto'
+}
+
+/** 风险等级：权限控件按它着色（只读=安全、工作区=常规、完全权限=危险、自动审查=实验）。 */
+export type PermissionRisk = 'safe' | 'normal' | 'danger' | 'experimental'
+
+export function permissionRisk(value: string): PermissionRisk {
+  if (value === 'read-only') return 'safe'
+  if (value === 'danger-full-access') return 'danger'
+  if (value === 'auto') return 'experimental'
+  return 'normal'
+}
+
 /** 选中预设的展示名；内置四个值走本地化，其它透传 host 名。 */
 export function presetLabel(value: string, name: string, labels: Record<string, string>): string {
-  const keys: Record<string, string> = {
-    'read-only': 'permission.readOnly',
-    'workspace-write': 'permission.workspaceWrite',
-    'danger-full-access': 'permission.fullAccess'
-  }
-  const key = keys[value]
-  if (key !== undefined && (name === value || name === key)) return labels[key] ?? name
+  const key = PRESET_KEYS[value]
+  if (key !== undefined && (name === value || name === key || /^[a-z0-9]+(-[a-z0-9]+)*$/.test(name))) return labels[key] ?? name
   if (/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name)) {
     return name.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
   }

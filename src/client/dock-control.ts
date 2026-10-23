@@ -7,7 +7,7 @@
  * - 新会话 hero 态：DSH 不渲染该 slot，由 hero-dock 注入容器承载，权限值改为
  *   轮询读取（见 hero-dock.ts）。
  *
- * 布局：权限组靠左、模型组靠右、统计项在中间聚簇（两侧 flex:1 等分）。
+ * 布局：模型组靠左、权限组靠右、统计项在中间聚簇（两侧 flex:1 等分）。
  */
 
 import type { ModelDirectories } from './model-directory'
@@ -39,8 +39,8 @@ export function createDockControl(props: DockHostProps) {
     // slot 路径：标准 hook 读会话权限投影，作为 runtime 值下传。
     const projection = props.useProjection('permissions')
     return h('div', { 'data-dsh-simplify-dock': '' },
-      h('div', { 'data-dsh-simplify-dock-left': '' }, h(permission as never, { permissionValue: projection?.currentValue })),
-      h('div', { 'data-dsh-simplify-dock-right': '' }, h(model as never, {}))
+      h('div', { 'data-dsh-simplify-dock-left': '' }, h(model as never, {})),
+      h('div', { 'data-dsh-simplify-dock-right': '' }, h(permission as never, { permissionValue: projection?.currentValue }))
     )
   }
 }

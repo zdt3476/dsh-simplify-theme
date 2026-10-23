@@ -7,7 +7,7 @@
  * 两步确认；其它预设直接提交。
  */
 
-import { presetLabel, CONFIRM_PRESETS, type PermissionCatalog, type PermissionCatalogStore } from './permission-catalog'
+import { presetLabel, permissionRisk, CONFIRM_PRESETS, type PermissionCatalog, type PermissionCatalogStore } from './permission-catalog'
 import { useDismiss } from './dock-shared'
 import { placePopup, measurePopup } from './popup'
 import type { DockShared } from './dock-shared'
@@ -65,7 +65,7 @@ export function createPermissionControl(props: PermissionControlProps) {
       }
     }
 
-    // 弹层锚定 dock 行（与聊天卡片同宽）的左缘，与权限 pill 的位置呼应。
+    // 弹层锚定 dock 行（与聊天卡片同宽）的右缘，与权限 pill 的位置呼应。
     hooks.useEffect(() => {
       if (!open) {
         setPos(null)
@@ -77,7 +77,7 @@ export function createPermissionControl(props: PermissionControlProps) {
       if (anchor === null || popup === null) return
       const rect = anchor.getBoundingClientRect()
       const size = measurePopup(popup)
-      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }, 'left'))
+      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }, 'right'))
     }, [open, catalog])
 
     hooks.useEffect(() => {
@@ -113,11 +113,13 @@ export function createPermissionControl(props: PermissionControlProps) {
     }
 
     const current: string | undefined = runtime.permissionValue
-    const label = current === undefined ? null : presetLabel(current, current, {
+    const labels = {
       'permission.readOnly': t('permission.readOnly'),
       'permission.workspaceWrite': t('permission.workspaceWrite'),
-      'permission.fullAccess': t('permission.fullAccess')
-    })
+      'permission.fullAccess': t('permission.fullAccess'),
+      'permission.auto': t('permission.auto')
+    }
+    const label = current === undefined ? null : presetLabel(current, current, labels)
 
     if (label === null) return null
 
@@ -126,23 +128,21 @@ export function createPermissionControl(props: PermissionControlProps) {
     if (error !== null) rows.push(h('div', { 'data-dsh-simplify-note': '', 'data-dsh-simplify-error': '' }, error))
     for (const option of catalog?.options ?? []) {
       const active = option.value === current
-      const name = presetLabel(option.value, option.name, {
-        'permission.readOnly': t('permission.readOnly'),
-        'permission.workspaceWrite': t('permission.workspaceWrite'),
-        'permission.fullAccess': t('permission.fullAccess')
-      })
+      const name = presetLabel(option.value, option.name, labels)
       rows.push(
         h('button', {
           type: 'button',
           'data-dsh-simplify-item': '',
+          'data-dsh-simplify-risk': permissionRisk(option.value),
           'data-active': active ? 'true' : 'false',
           key: option.value,
           disabled: busy !== null,
           onClick: () => pick(option.value)
         },
+        h('span', { 'data-dsh-simplify-risk-dot': '', 'aria-hidden': 'true' }),
         h('span', { style: { flex: 1, minWidth: 0 } }, name),
-        option.value === 'auto' ? h('span', { 'data-dsh-simplify-badge': '' }, 'EXP') : null,
-        active ? '✓' : null,
+        option.value === 'auto' ? h('span', { 'data-dsh-simplify-badge': '' }, t('permission.experimental')) : null,
+        active ? h('span', { 'data-dsh-simplify-check': '', 'aria-hidden': 'true' }, '✓') : null,
         option.description !== undefined ? h('span', { 'data-dsh-simplify-item-detail': '' }, option.description) : null
         )
       )
@@ -166,12 +166,16 @@ export function createPermissionControl(props: PermissionControlProps) {
         type: 'button',
         'data-dsh-simplify-pill': '',
         'data-dsh-simplify-control': 'permission',
+        'data-dsh-simplify-emphasis': 'permission',
+        'data-dsh-simplify-risk': current === undefined ? 'normal' : permissionRisk(current),
         'aria-haspopup': 'dialog',
         'aria-expanded': open ? 'true' : 'false',
         ref: (el: HTMLElement | null) => { triggerRef.current = el },
         onClick: (event: Event) => { event.stopPropagation(); void toggle() }
       },
-      h('span', { 'data-dsh-simplify-pill-label': '' }, label)
+      h('span', { 'data-dsh-simplify-pill-glyph': '', 'aria-hidden': 'true' }),
+      h('span', { 'data-dsh-simplify-pill-label': '' }, label),
+      h('span', { 'data-dsh-simplify-pill-caret': '', 'aria-hidden': 'true' })
       ),
       open ? h('div', {
         'data-dsh-simplify-popup': '',

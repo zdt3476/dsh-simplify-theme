@@ -18,7 +18,9 @@ import { mountSidebarFilter } from './sidebar-filter-mount'
 import { mountSidebarGroups } from './sidebar-groups'
 import type { ActivityStore, SessionActivitySnapshot, WorkspaceActivitySnapshot } from './sidebar-activity'
 import { mountHeroDock } from './hero-dock'
+import { mountStatColors } from './stat-colors-mount'
 import { readArchivedFilter, VIEW_STORE_KEY } from './view-state'
+import { withFallback } from './locale-fallback'
 import { createDockControl } from './dock-control'
 import type { DockShared, H, ReactHooks } from './dock-shared'
 import type { ModelDirectories } from './model-directory'
@@ -91,6 +93,8 @@ const DICT_ZH: Record<string, string> = {
   'permission.readOnly': '仅可查看',
   'permission.workspaceWrite': '工作区内修改',
   'permission.fullAccess': '完全权限',
+  'permission.auto': '自动审查',
+  'permission.experimental': '实验',
   'permission.loading': '正在加载权限目录…',
   'permission.confirmTitle': '此模式将减少确认步骤，确认继续？',
   'permission.confirmEnable': '我已了解风险，继续启用',
@@ -122,6 +126,8 @@ const DICT_EN: Record<string, string> = {
   'permission.readOnly': 'Read Only',
   'permission.workspaceWrite': 'Workspace Write',
   'permission.fullAccess': 'Full access',
+  'permission.auto': 'Auto review',
+  'permission.experimental': 'Beta',
   'permission.loading': 'Loading permission catalog…',
   'permission.confirmTitle': 'This mode reduces confirmation steps. Continue?',
   'permission.confirmEnable': 'I understand the risk, continue',
@@ -155,7 +161,7 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
     return service
   }
   ctx.effect(() => {
-    const t = ctx.locale.bind(PLUGIN_ID)
+    const t = withFallback(ctx.locale.bind(PLUGIN_ID), DICT_ZH)
     const makeEl = (tag: string) => document.createElement(tag)
     // slot 容器由 ui-workspace 异步渲染；激活期 anchor 常不存在，短重试兜底。
     if (typeof document === 'undefined') return
@@ -192,7 +198,7 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
   }, 'simplify-theme: sidebar tabs')
 
   ctx.effect(() => {
-    const filterT = ctx.locale.bind(PLUGIN_ID)
+    const filterT = withFallback(ctx.locale.bind(PLUGIN_ID), DICT_ZH)
     if (typeof document === 'undefined') return
     let filterMount: { unmount: () => void } | null = null
     let filterRetries = 0
@@ -217,7 +223,7 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
 
   ctx.effect(() => {
     if (typeof document === 'undefined') return
-    const groupsT = ctx.locale.bind(PLUGIN_ID)
+    const groupsT = withFallback(ctx.locale.bind(PLUGIN_ID), DICT_ZH)
     const workspaces = ctx.workspaces?.list
     const sessions = ctx.sessions?.list
     if (workspaces === undefined || sessions === undefined) throw new Error('sidebar activity stores unavailable')
@@ -246,7 +252,7 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
 
   ctx.effect(() => {
     if (typeof document === 'undefined') return
-    const t = ctx.locale.bind(PLUGIN_ID)
+    const t = withFallback(ctx.locale.bind(PLUGIN_ID), DICT_ZH)
     const reactModule = require('react') as unknown as { createElement: H }
     const hero = mountHeroDock({
       directories: ctx.modelDirectories,
@@ -272,13 +278,18 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
     })
     return () => hero?.dispose()
   }, 'simplify-theme: hero dock')
+
+  ctx.effect(() => {
+    const mount = mountStatColors()
+    return () => mount?.unmount()
+  }, 'simplify-theme: stat colors')
 }
 
 function registerDock(ctx: ClientCtx): void {
   const react = require('react') as unknown as { createElement: unknown }
   const hooks = require('react') as unknown as ReactHooks
   const h = react.createElement as H
-  const t = ctx.locale.bind(PLUGIN_ID)
+  const t = withFallback(ctx.locale.bind(PLUGIN_ID), DICT_ZH)
   const shared: DockShared = { h, hooks, t }
 
   ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register(

@@ -4,7 +4,7 @@
  * DSH 只在会话态渲染 `conversation.composer.dock` slot；hero 态下该 slot 不存在，
  * 原生 model / permission 控件仍留在输入卡片里。这里在 hero 的 dock 行
  * （`[data-composer-dock]`）里注入我们自己的控件容器，让两种状态的排版一致：
- * 权限贴卡片左缘、模型贴右缘、统计项居中。
+ * 模型贴卡片左缘、权限贴右缘、统计项居中。
  *
  * 注入的容器带 `data-dsh-simplify-dock`，因此 `:has()` 隐藏原生座位的规则在 hero
  * 态同样生效；进入会话态（slot 出现）时自动移除，交还给 slot 渲染。
@@ -111,8 +111,8 @@ export function mountHeroDock(options: HeroDockOptions): HeroDockHandle | null {
       return options.shared.h(
         'div',
         { 'data-dsh-simplify-dock': '' },
-        options.shared.h('div', { 'data-dsh-simplify-dock-left': '' }, options.shared.h(permission as never, { permissionValue })),
-        options.shared.h('div', { 'data-dsh-simplify-dock-right': '' }, options.shared.h(model as never, {}))
+        options.shared.h('div', { 'data-dsh-simplify-dock-left': '' }, options.shared.h(model as never, {})),
+        options.shared.h('div', { 'data-dsh-simplify-dock-right': '' }, options.shared.h(permission as never, { permissionValue }))
       )
     }
     componentCache.set(sessionId, component)

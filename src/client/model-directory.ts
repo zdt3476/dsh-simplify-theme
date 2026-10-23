@@ -6,6 +6,8 @@
  * 选择走 `directory.select({ provider, model, reasoningEffort? })`。
  */
 
+import { effortName } from './localize'
+
 export interface ReasoningMeta {
   defaultEffort?: string
   efforts?: ReadonlyArray<{ id: string; name: string }>
@@ -81,11 +83,12 @@ export function effortLabel(groups: readonly CatalogGroup[], selection: ModelSel
   const meta = reasoningFor(groups, selection)
   const current = selection.reasoningEffort ?? meta?.defaultEffort ?? retainedEffort
   if (current === undefined) return meta === undefined ? undefined : defaultLabel
-  return meta?.efforts?.find((level) => level.id === current)?.name ?? current
+  return effortName(current, meta?.efforts?.find((level) => level.id === current)?.name)
 }
 
 export function effortLevels(meta: ReasoningMeta | undefined, defaultLabel: string): Array<{ id?: string; name: string }> {
   const levels = meta?.efforts
   if (meta === undefined || levels === undefined || levels.length === 0) return []
-  return meta.defaultEffort === undefined ? [{ name: defaultLabel }, ...levels] : [...levels]
+  const named = levels.map((level) => ({ id: level.id, name: effortName(level.id, level.name) }))
+  return meta.defaultEffort === undefined ? [{ name: defaultLabel }, ...named] : named
 }
