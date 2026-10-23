@@ -15,3 +15,6 @@ npm-debug.log*
 
 # 本地临时产物
 *.tmp
+
+# npm pack 产物
+*.tgz
