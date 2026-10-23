@@ -478,21 +478,21 @@ export const UI_CSS = `
   box-sizing: border-box;
 }
 
+/* 标签绝对定位在档位比例处，与滑块轨道（两侧各让出半个滑块）对齐 */
 [data-dsh-simplify-effort-scale] {
-  display: flex;
-  justify-content: space-between;
-  gap: 4px;
-  margin-top: 8px;
+  position: relative;
+  height: 16px;
+  margin: 6px 8px 0;
   font-size: 11px;
   color: var(--dsw-alias-label-caption);
+  /* 两端标签的中心也要压在刻度上，允许溢出到弹层内边距 */
+  overflow: visible;
 }
 
 [data-dsh-simplify-effort-scale] > span {
-  flex: 1 1 0;
-  text-align: center;
+  position: absolute;
+  top: 0;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 [data-dsh-simplify-effort-scale] > span[data-active='true'] {
@@ -623,7 +623,7 @@ export const UI_CSS = `
   gap: 6px;
 }
 [data-dsh-simplify-control='effort'] { flex: none; }
-[data-dsh-simplify-control='model'] { max-width: 220px; }
+[data-dsh-simplify-control='model'] { max-width: 240px; }
 
 [data-dsh-simplify-filter] {
   appearance: none;

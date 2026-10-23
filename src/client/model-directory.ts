@@ -56,11 +56,11 @@ export interface ModelDirectories {
 }
 
 /** 供应商强调色：按 id 稳定取色，避免供应商增减时颜色互相串位。 */
+// 只用非危险色：红色在权限语境里表示完全权限，拿来标供应商会误导。
 const PROVIDER_COLORS = [
   'var(--dsw-alias-state-business-primary)',
   'var(--dsw-alias-state-success-primary)',
-  'var(--dsw-alias-state-warn-primary)',
-  'var(--dsw-alias-state-error-primary)'
+  'var(--dsw-alias-state-warn-primary)'
 ]
 
 /**
@@ -85,6 +85,18 @@ export function orderGroups(groups: readonly CatalogGroup[]): CatalogGroup[] {
 export function reasoningFor(groups: readonly CatalogGroup[], selection: ModelSelection | null): ReasoningMeta | undefined {
   if (selection === null) return undefined
   return groups.find((group) => group.id === selection.provider)?.models.find((model) => model.id === selection.model)?.reasoning
+}
+
+/**
+ * 切换模型时沿用原思考档位。
+ * @param meta 目标模型的思考元数据。
+ * @param previous 切换前的档位 id。
+ * @returns 目标模型支持的档位；不支持则回落到该模型的默认档位。
+ */
+export function retainEffort(meta: ReasoningMeta | undefined, previous: string | undefined): string | undefined {
+  if (previous === undefined) return meta?.defaultEffort
+  if (meta?.efforts?.some((level) => level.id === previous) === true) return previous
+  return meta?.defaultEffort
 }
 
 /** 选中项的展示名；目录丢失时回落到模型 id。 */

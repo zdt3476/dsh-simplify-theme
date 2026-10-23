@@ -8,7 +8,7 @@
  */
 
 import type { ModelDirectories, ModelSelection, CatalogGroup } from './model-directory'
-import { effortLabel, effortLevels, displayName, orderGroups, providerColor } from './model-directory'
+import { effortLabel, effortLevels, displayName, orderGroups, providerColor, retainEffort } from './model-directory'
 import { effortName, providerName } from './localize'
 import { placePopup, measurePopup } from './popup'
 import { useDismiss } from './dock-shared'
@@ -44,7 +44,10 @@ export function createModelControl(props: ModelControlProps) {
     const selection: ModelSelection | null = state.pending ?? state.current
     const name = displayName(groups, selection)
     const group = selection === null ? undefined : groups.find((candidate) => candidate.id === selection.provider)
-    const providerPrefix = group === undefined ? '' : `${providerName(group.id, group.name)} / `
+    // 供应商前缀只在同名模型跨供应商重名时才需要；否则让模型名独占空间，长名字更可读。
+    const duplicatedName = groups.filter((candidate) => candidate.models.some((model) => model.name === name)).length > 1
+    const providerLabel = group === undefined ? '' : providerName(group.id, group.name)
+    const modelLabel = name === '' ? t('model.placeholder') : duplicatedName ? `${providerLabel} / ${name}` : name
     const effort = effortLabel(groups, selection, t('effort.providerDefault'), state.retainedEffort)
     const busy = state.status === 'selecting' || state.status === 'loading'
 
@@ -83,8 +86,10 @@ export function createModelControl(props: ModelControlProps) {
       setOpen((prev) => (prev === 'model' ? 'none' : 'model'))
     }
 
-    const pickModel = (provider: string, model: string, defaultEffort?: string) => {
-      void directory.select({ provider, model, ...(defaultEffort === undefined ? {} : { reasoningEffort: defaultEffort }) })
+    const pickModel = (provider: string, model: string, meta?: import('./model-directory').ReasoningMeta) => {
+      // 换模型保留原思考档位；目标模型不支持该档位时用它自己的默认档位。
+      const nextEffort = retainEffort(meta, selection?.reasoningEffort)
+      void directory.select({ provider, model, ...(nextEffort === undefined ? {} : { reasoningEffort: nextEffort }) })
       close()
     }
 
@@ -100,6 +105,7 @@ export function createModelControl(props: ModelControlProps) {
         'data-dsh-simplify-pill': '',
         'data-dsh-simplify-control': kind,
         'data-dsh-simplify-emphasis': kind,
+        title: kind === 'model' && name !== '' ? `${providerLabel} / ${name}` : undefined,
         style: color === undefined ? undefined : { '--dsh-simplify-provider-color': color },
         'aria-label': kind === 'effort' ? `${t('effort.title')}：${effort ?? t('effort.unavailableShort')}` : undefined,
         'aria-haspopup': 'dialog',
@@ -121,7 +127,7 @@ export function createModelControl(props: ModelControlProps) {
     // 供应商色按「有模型的供应商」在面板里的顺序取，保证同面板内不撞色。
     const orderedProviders = groups.filter((candidate) => candidate.models.length > 0)
     const providerIndex = group === undefined ? -1 : orderedProviders.findIndex((candidate) => candidate.id === group.id)
-    const modelPill = pill('model', name === '' ? t('model.placeholder') : h('span', { 'data-dsh-simplify-pill-label': '' }, providerPrefix + name), providerIndex < 0 || group === undefined ? undefined : providerColor(group.id, providerIndex))
+    const modelPill = pill('model', h('span', { 'data-dsh-simplify-pill-label': '' }, modelLabel), providerIndex < 0 || group === undefined ? undefined : providerColor(group.id, providerIndex))
     const children: unknown[] = [modelPill]
 
     children.push(pill('effort', h('span', { 'data-dsh-simplify-pill-label': '' }, effort ?? t('effort.unavailableShort'))))
@@ -149,7 +155,7 @@ export function createModelControl(props: ModelControlProps) {
               'data-active': active ? 'true' : 'false',
               style: { '--dsh-simplify-provider-color': color },
               key: `m:${group.id}:${model.id}`,
-              onClick: () => pickModel(group.id, model.id, model.reasoning?.defaultEffort)
+              onClick: () => pickModel(group.id, model.id, model.reasoning)
             },
             h('span', { style: { flex: 1, minWidth: 0 } }, model.name),
             effortCount > 1 ? h('span', { 'data-dsh-simplify-badge': '' }, String(effortCount)) : null,
@@ -229,11 +235,15 @@ export function createModelControl(props: ModelControlProps) {
               }
             })
           ),
-          h('div', { 'data-dsh-simplify-effort-scale': '' }, levels.map((level, levelIndex) =>
-            h('span', {
+          h('div', { 'data-dsh-simplify-effort-scale': '' }, levels.map((level, levelIndex) => {
+            const ratio = levels.length > 1 ? levelIndex / (levels.length - 1) : 0
+            return h('span', {
               key: level.id ?? 'provider-default',
-              'data-active': levelIndex === index ? 'true' : 'false'
-            }, level.name)))
+              'data-active': levelIndex === index ? 'true' : 'false',
+              // 标签中心对准档位位置（含两端），与滑块拇指轨迹重合。
+              style: { left: `${ratio * 100}%`, transform: 'translateX(-50%)' }
+            }, level.name)
+          }))
           )
         )
       }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { effortLabel, effortLevels, displayName, orderGroups, providerColor, reasoningFor } from '../../src/client/model-directory'
+import { effortLabel, effortLevels, displayName, orderGroups, providerColor, reasoningFor, retainEffort } from '../../src/client/model-directory'
 import { computeHiddenRows, readRow } from '../../src/client/sidebar-filter'
 import { tabLabels } from '../../src/client/sidebar-tabs'
 import { placePopup } from '../../src/client/popup'
@@ -226,5 +226,17 @@ describe('provider colors', () => {
     expect(providerColor('deepseek-official')).toBe(a)
     const colors = new Set(['deepseek-official', 'deepseek-account', 'openai', 'anthropic'].map(providerColor))
     expect(colors.size).toBeGreaterThan(1)
+  })
+})
+
+describe('effort retention across model switch', () => {
+  const meta = (efforts: string[], defaultEffort?: string) => ({ defaultEffort, efforts: efforts.map((id) => ({ id, name: id })) })
+
+  it('目标模型支持原档位时保留，否则回落到它的默认档位', () => {
+    expect(retainEffort(meta(['low', 'high']), 'high')).toBe('high')
+    expect(retainEffort(meta(['low', 'high'], 'low'), 'high')).toBe('high')
+    expect(retainEffort(meta(['low', 'medium'], 'medium'), 'high')).toBe('medium')
+    expect(retainEffort(undefined, 'high')).toBeUndefined()
+    expect(retainEffort(meta(['low'], 'low'), undefined)).toBe('low')
   })
 })
