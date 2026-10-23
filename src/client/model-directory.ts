@@ -36,6 +36,8 @@ export interface DirectorySnapshot {
   status: 'idle' | 'loading' | 'ready' | 'error' | 'selecting'
   pending: ModelSelection | null
   error: string | null
+  retainedEffort?: string
+  routable?: boolean | null
 }
 
 export interface ModelDirectory {
@@ -74,10 +76,16 @@ export function displayName(groups: readonly CatalogGroup[], selection: ModelSel
  * 当前思考等级的展示名。目录元数据缺失时回落到原始 effort id——原生触发器
  * 在这种场景也显示 id，这里保持一致，避免思考等级 pill 无声消失。
  */
-export function effortLabel(groups: readonly CatalogGroup[], selection: ModelSelection | null): string | undefined {
+export function effortLabel(groups: readonly CatalogGroup[], selection: ModelSelection | null, defaultLabel = '供应商默认', retainedEffort?: string): string | undefined {
   if (selection === null) return undefined
   const meta = reasoningFor(groups, selection)
-  const current = selection.reasoningEffort ?? meta?.defaultEffort
-  if (current === undefined) return undefined
+  const current = selection.reasoningEffort ?? meta?.defaultEffort ?? retainedEffort
+  if (current === undefined) return meta === undefined ? undefined : defaultLabel
   return meta?.efforts?.find((level) => level.id === current)?.name ?? current
+}
+
+export function effortLevels(meta: ReasoningMeta | undefined, defaultLabel: string): Array<{ id?: string; name: string }> {
+  const levels = meta?.efforts
+  if (meta === undefined || levels === undefined || levels.length === 0) return []
+  return meta.defaultEffort === undefined ? [{ name: defaultLabel }, ...levels] : [...levels]
 }

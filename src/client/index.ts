@@ -58,7 +58,10 @@ interface ClientCtx {
   }
   theme?: { overrideTokens: (source: string, tokens: unknown) => () => void }
   uiWorkspace?: {
-    view: { setArchivedFilter: (filter: 'default' | 'show' | 'only') => void }
+    view: {
+      setArchivedFilter: (filter: 'default' | 'show' | 'only') => void
+      setGroupBy: (mode: 'workspace' | 'workspace-tree' | 'flat') => void
+    }
   }
 }
 
@@ -66,7 +69,15 @@ export const name = PLUGIN_ID
 export const inject = ['slots', 'locale', 'modelDirectories', 'remote', 'remote.permissionPresets', 'sessions', 'workspaces', 'theme']
 
 const DICT_ZH: Record<string, string> = {
-  'tabs.sessions': '会话',
+  'tabs.sessions': '未归档',
+  'filter.placeholder': '筛选工作区或会话…',
+  'filter.ariaLabel': '筛选工作区或会话',
+  'filter.groupBy': '列表分组',
+  'filter.workspace': '工作区',
+  'filter.workspace-tree': '目录树',
+  'filter.flat': '全部会话',
+  'effort.providerDefault': '供应商默认',
+  'effort.unavailableShort': '不可用',
   'tabs.archived': '已归档',
   'groups.more': '还有 {count} 个工作区',
   'groups.collapse': '收起工作区',
@@ -89,7 +100,15 @@ const DICT_ZH: Record<string, string> = {
 }
 
 const DICT_EN: Record<string, string> = {
-  'tabs.sessions': 'Sessions',
+  'tabs.sessions': 'Unarchived',
+  'filter.placeholder': 'Filter workspaces or sessions…',
+  'filter.ariaLabel': 'Filter workspaces or sessions',
+  'filter.groupBy': 'Group list',
+  'filter.workspace': 'Workspaces',
+  'filter.workspace-tree': 'Folder tree',
+  'filter.flat': 'All sessions',
+  'effort.providerDefault': 'Provider default',
+  'effort.unavailableShort': 'Unavailable',
   'tabs.archived': 'Archived',
   'groups.more': '{count} more workspaces',
   'groups.collapse': 'Collapse workspaces',
@@ -181,6 +200,7 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
       if (filterMount !== null) return
       filterMount = mountSidebarFilter({
         locale: filterT,
+        setGroupBy: mode => workspace().view.setGroupBy(mode),
         createElement: (tag) => document.createElement(tag)
       })
       if (filterMount === null && filterRetries < 40) {

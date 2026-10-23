@@ -90,22 +90,6 @@ export const UI_CSS = `
   white-space: nowrap;
 }
 
-[data-dsh-simplify-pill-caption] {
-  color: var(--dsw-alias-label-caption);
-  flex: none;
-}
-
-[data-dsh-simplify-caret] {
-  flex: none;
-  color: var(--dsw-alias-label-caption);
-  font-size: 10px;
-  transition: transform 0.12s ease;
-}
-
-[data-dsh-simplify-pill][aria-expanded='true'] [data-dsh-simplify-caret] {
-  transform: rotate(180deg);
-}
-
 /* —— 弹层 —— */
 [data-dsh-simplify-popup] {
   position: fixed;
@@ -327,10 +311,36 @@ export const UI_CSS = `
 
 [data-dsh-simplify-filter-host] {
   display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 34px;
   min-width: 0;
-  flex: 1;
-  padding: 4px 8px;
+  flex: 0 0 34px;
+  gap: 6px;
+  margin: 0 4px 6px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-sm);
 }
+
+[data-dsh-simplify-sidebar-header] > span:first-child { margin-right: auto; }
+[data-dsh-simplify-tabs-host] { flex: none; }
+[data-dsh-simplify-native-filter] { display: none !important; }
+[data-dsh-simplify-grouping] {
+  flex: none;
+  max-width: 86px;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+[data-dsh-simplify-dock-right] > [data-dsh-simplify-dock-root] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+[data-dsh-simplify-control='effort'] { flex: none; }
+[data-dsh-simplify-control='model'] { max-width: 220px; }
 
 [data-dsh-simplify-filter] {
   appearance: none;

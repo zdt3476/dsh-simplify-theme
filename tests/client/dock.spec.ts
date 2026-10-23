@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { effortLabel, displayName, orderGroups, reasoningFor } from '../../src/client/model-directory'
+import { effortLabel, effortLevels, displayName, orderGroups, reasoningFor } from '../../src/client/model-directory'
 import { computeHiddenRows, readRow } from '../../src/client/sidebar-filter'
 import { tabLabels } from '../../src/client/sidebar-tabs'
 import { placePopup } from '../../src/client/popup'
@@ -25,9 +25,20 @@ describe('model directory helpers', () => {
     const selection = { provider: 'openai', model: 'gpt-5', reasoningEffort: 'medium' }
     expect(displayName(groups, selection)).toBe('GPT-5')
     expect(effortLabel(groups, selection)).toBe('中')
+    expect(effortLabel([{ id: 'p', name: 'P', models: [{ id: 'm', name: 'M', reasoning: { efforts: [{ id: 'high', name: '高' }] } }] }], { provider: 'p', model: 'm' })).toBe('供应商默认')
+    expect(effortLabel(groups, { provider: 'deepseek-official', model: 'deepseek-flash' })).toBeUndefined()
     expect(effortLabel(groups, { provider: 'openai', model: 'gpt-5' })).toBe('高')
     expect(reasoningFor(groups, { provider: 'none', model: 'x' })).toBeUndefined()
     expect(displayName(groups, null)).toBe('')
+  })
+
+  it('滑块保留供应商默认档位，不擅自采用第一档', () => {
+    const levels = [{ id: 'low', name: '低' }, { id: 'high', name: '高' }]
+    expect(effortLevels({ efforts: levels }, '默认')).toEqual([{ name: '默认' }, ...levels])
+    expect(effortLevels({ efforts: levels, defaultEffort: 'high' }, '默认')).toEqual(levels)
+    expect(effortLevels(undefined, '默认')).toEqual([])
+    expect(effortLevels({ efforts: [] }, '默认')).toEqual([])
+    expect(effortLabel([], { provider: 'x', model: 'm' }, '默认', 'high')).toBe('high')
   })
 
   it('目录丢失时展示名回落到模型 id', () => {

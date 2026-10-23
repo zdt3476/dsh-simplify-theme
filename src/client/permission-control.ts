@@ -165,12 +165,13 @@ export function createPermissionControl(props: PermissionControlProps) {
       h('button', {
         type: 'button',
         'data-dsh-simplify-pill': '',
+        'data-dsh-simplify-control': 'permission',
+        'aria-haspopup': 'dialog',
         'aria-expanded': open ? 'true' : 'false',
         ref: (el: HTMLElement | null) => { triggerRef.current = el },
         onClick: (event: Event) => { event.stopPropagation(); void toggle() }
       },
-      h('span', { 'data-dsh-simplify-pill-label': '' }, label),
-      h('span', { 'data-dsh-simplify-caret': '', 'aria-hidden': 'true' }, '▾')
+      h('span', { 'data-dsh-simplify-pill-label': '' }, label)
       ),
       open ? h('div', {
         'data-dsh-simplify-popup': '',

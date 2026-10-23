@@ -8,7 +8,7 @@
  */
 
 import type { ModelDirectories, ModelSelection, CatalogGroup } from './model-directory'
-import { effortLabel, displayName, orderGroups } from './model-directory'
+import { effortLabel, effortLevels, displayName, orderGroups } from './model-directory'
 import { placePopup, measurePopup } from './popup'
 import { useDismiss } from './dock-shared'
 import type { DockShared } from './dock-shared'
@@ -44,7 +44,7 @@ export function createModelControl(props: ModelControlProps) {
     const name = displayName(groups, selection)
     const group = selection === null ? undefined : groups.find((candidate) => candidate.id === selection.provider)
     const providerPrefix = group === undefined ? '' : `${group.id === 'deepseek-account' ? t('provider.account') : group.name} / `
-    const effort = effortLabel(groups, selection)
+    const effort = effortLabel(groups, selection, t('effort.providerDefault'), state.retainedEffort)
     const busy = state.status === 'selecting' || state.status === 'loading'
 
     const close = () => {
@@ -87,16 +87,19 @@ export function createModelControl(props: ModelControlProps) {
       close()
     }
 
-    const commitEffort = (value: string) => {
-      if (state.current === null) return
-      void directory.select({ provider: state.current.provider, model: state.current.model, reasoningEffort: value })
+    const commitEffort = (value: string | undefined) => {
+      if (selection === null) return
+      void directory.select({ provider: selection.provider, model: selection.model, ...(value === undefined ? {} : { reasoningEffort: value }) })
       close()
     }
 
-    const pill = (kind: 'model' | 'effort', label: unknown, caption?: string) =>
+    const pill = (kind: 'model' | 'effort', label: unknown) =>
       h('button', {
         type: 'button',
         'data-dsh-simplify-pill': '',
+        'data-dsh-simplify-control': kind,
+        'aria-label': kind === 'effort' ? `${t('effort.title')}：${effort ?? t('effort.unavailableShort')}` : undefined,
+        'aria-haspopup': 'dialog',
         'aria-expanded': open === kind ? 'true' : 'false',
         disabled: busy,
         ref: (el: HTMLElement | null) => {
@@ -107,15 +110,13 @@ export function createModelControl(props: ModelControlProps) {
           if (kind === 'model') openDirectory()
           else setOpen((prev) => (prev === 'effort' ? 'none' : 'effort'))
         }
-      }, label, caption === undefined ? null : h('span', { 'data-dsh-simplify-pill-caption': '' }, caption), h('span', { 'data-dsh-simplify-caret': '', 'aria-hidden': 'true' }, '▾'))
+      }, label)
 
     const children: unknown[] = [
-      pill('model', name === '' ? t('model.placeholder') : h('span', { 'data-dsh-simplify-pill-label': '' }, providerPrefix + name), effort === undefined ? undefined : undefined)
+      pill('model', name === '' ? t('model.placeholder') : h('span', { 'data-dsh-simplify-pill-label': '' }, providerPrefix + name))
     ]
 
-    if (effort !== undefined) {
-      children.push(pill('effort', h('span', { 'data-dsh-simplify-pill-label': '' }, effort)))
-    }
+    children.push(pill('effort', h('span', { 'data-dsh-simplify-pill-label': '' }, `${t('effort.title')}：${effort ?? t('effort.unavailableShort')}`)))
 
     // 模型列表：平铺放大——一供应商一列，列内模型纵向排列，全目录一屏可见。
     if (open === 'model') {
@@ -161,13 +162,13 @@ export function createModelControl(props: ModelControlProps) {
     }
 
     // 思考等级滑块
-    if (open === 'effort' && selection !== null) {
-      const meta = groups.find((candidate) => candidate.id === selection.provider)?.models.find((candidate) => candidate.id === selection.model)?.reasoning
-      const levels = meta?.efforts ?? []
+    if (open === 'effort') {
+      const meta = groups.find((candidate) => candidate.id === selection?.provider)?.models.find((candidate) => candidate.id === selection?.model)?.reasoning
+      const levels = effortLevels(meta, t('effort.providerDefault'))
       if (levels.length === 0) {
         children.push(h('div', { 'data-dsh-simplify-popup': '', ref: (el: HTMLElement | null) => { popupRef.current = el }, style: pos === null ? { visibility: 'hidden' } : { left: pos.left, top: pos.top } }, h('div', { 'data-dsh-simplify-note': '' }, t('effort.unavailable'))))
       } else {
-        const currentId = draftEffort ?? selection.reasoningEffort ?? meta?.defaultEffort ?? levels[0]?.id
+        const currentId = draftEffort === null ? selection?.reasoningEffort ?? meta?.defaultEffort : draftEffort || undefined
         const index = Math.max(0, levels.findIndex((level) => level.id === currentId))
         children.push(
           h('div', {
@@ -179,6 +180,8 @@ export function createModelControl(props: ModelControlProps) {
           h('div', { 'data-dsh-simplify-effort-title': '' }, t('effort.title')),
           h('input', {
             type: 'range',
+            'aria-label': t('effort.title'),
+            'aria-valuetext': levels[index]?.name,
             'data-dsh-simplify-effort-slider': '',
             min: 0,
             max: levels.length - 1,
@@ -186,7 +189,7 @@ export function createModelControl(props: ModelControlProps) {
             value: index,
             onChange: (event: Event) => {
               const input = event.target as HTMLInputElement
-              setDraftEffort(levels[Number(input.value)]?.id ?? null)
+              setDraftEffort(levels[Number(input.value)]?.id ?? '')
             },
             onPointerUp: (event: Event) => {
               const level = levels[Number((event.target as HTMLInputElement).value)]
@@ -200,7 +203,7 @@ export function createModelControl(props: ModelControlProps) {
               }
             }
           }),
-          h('div', { 'data-dsh-simplify-effort-scale': '' }, levels.map((level) => h('span', { key: level.id }, level.name)))
+          h('div', { 'data-dsh-simplify-effort-scale': '' }, levels.map((level) => h('span', { key: level.id ?? 'provider-default' }, level.name)))
         )
         )
       }

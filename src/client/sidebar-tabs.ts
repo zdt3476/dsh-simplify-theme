@@ -11,6 +11,7 @@
 
 import type { ArchivedFilter } from './view-state'
 import { VIEW_STORE_KEY, readArchivedFilter } from './view-state'
+import { sidebarHeader } from './sidebar-dom'
 
 export interface WorkspaceViewActions {
   setArchivedFilter: (filter: ArchivedFilter) => void
@@ -65,11 +66,11 @@ export function mountSidebarTabs(options: SidebarTabsOptions): Mount | null {
   // slot 容器由 ui-workspace 的 slot 声明异步渲染；激活期可能还不存在。
   // 短重试兜底，命中即挂；超过上限放弃（下一次插件重载会再试）。
   if (anchor === null) return null
+  const header = sidebarHeader(anchor)
+  if (header === null) return null
   const container = makeEl('div')
   container.dataset.dshSimplifyTabsHost = ''
-  const firstChild = anchor.firstElementChild
-  if (firstChild !== null) anchor.insertBefore(container, firstChild)
-  else anchor.appendChild(container)
+  header.insertAdjacentElement('afterend', container)
 
   const { createElement, createRoot } = React
   const root = createRoot(container)

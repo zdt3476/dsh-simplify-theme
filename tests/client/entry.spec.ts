@@ -61,6 +61,9 @@ describe('client entry', () => {
     // 供应商前缀由 dock 模型 pill 承担；不再占用 label slot（避免 '·' 拼接观感）。
     expect(injected).not.toContain('conversation.input.model.label')
 
-    expect(localeRegister).toHaveBeenCalledWith('dsh-simplify-theme', expect.objectContaining({ zh: expect.anything(), en: expect.anything() }))
+    expect(localeRegister).toHaveBeenCalledWith('dsh-simplify-theme', expect.objectContaining({
+      zh: expect.objectContaining({ 'filter.placeholder': '筛选工作区或会话…', 'filter.ariaLabel': '筛选工作区或会话', 'effort.providerDefault': '供应商默认' }),
+      en: expect.objectContaining({ 'filter.placeholder': 'Filter workspaces or sessions…', 'effort.providerDefault': 'Provider default' })
+    }))
   })
 })
