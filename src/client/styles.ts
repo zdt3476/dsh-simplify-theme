@@ -20,7 +20,28 @@ export const UI_CSS = `
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 100%;
+}
+
+/* dock 行对齐聊天卡片：复用卡片自身的宽度约束，权限/模型贴卡片左右缘 */
+[data-composer-dock]:has([data-dsh-simplify-dock]) {
+  box-sizing: border-box;
+  width: calc(100% - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset));
+  max-width: calc(var(--dsh-composer-card-max-width) - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset));
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
+}
+
+[data-composer-dock]:has([data-dsh-simplify-dock]) > :not([data-dsh-simplify-dock]):not([data-slot]) {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+[data-composer-dock]:has([data-dsh-simplify-dock]) > [data-slot='conversation.composer.dock'] > :not([data-dsh-simplify-dock]) {
+  display: none;
 }
 
 [data-dsh-simplify-dock-left],

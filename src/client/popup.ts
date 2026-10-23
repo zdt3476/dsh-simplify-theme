@@ -23,11 +23,14 @@ export function placePopup(
   rect: AnchorRect,
   size: { width: number; height: number },
   viewport: { width: number; height: number },
-  align: 'left' | 'right' = 'left'
+  align: 'center' | 'left' | 'right' = 'center'
 ): Placement {
-  let left = align === 'right' ? rect.right - size.width : rect.left
+  let left: number
+  if (align === 'center') left = (rect.left + rect.right) / 2 - size.width / 2
+  else if (align === 'right') left = rect.right - size.width
+  else left = rect.left
   if (left + size.width > viewport.width - 8) left = viewport.width - 8 - size.width
-  if (left < 8) left = align === 'right' ? Math.max(8, rect.right - size.width) : 8
+  if (left < 8) left = 8
   let top = rect.bottom + 4
   if (top + size.height > viewport.height - 8) top = Math.max(8, rect.top - size.height - 4)
   return { left: Math.round(left), top: Math.round(top) }

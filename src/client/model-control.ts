@@ -59,7 +59,7 @@ export function createModelControl(props: ModelControlProps) {
       if (trigger === null || popup === null) return
       const rect = trigger.getBoundingClientRect()
       const size = measurePopup(popup)
-      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }, 'right'))
+      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }))
     }, [open, state.groups.length])
 
     hooks.useEffect(() => {
