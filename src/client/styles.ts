@@ -64,38 +64,34 @@ export const UI_CSS = `
   justify-content: flex-end;
 }
 
-/* 参考主流选择器：浅底 + 发丝边 + 品牌色图标点，展开时换成品牌色描边。 */
+/* 与 DSH 原生 seat 同规格：透明底、无描边，悬停/展开才出现浅灰底 */
 [data-dsh-simplify-pill] {
   appearance: none;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--dsw-alias-border-l1);
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-primary);
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
   gap: 6px;
-  height: 24px;
+  height: 28px;
   padding: 0 8px;
   border-radius: var(--dsw-radius-sm);
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 13px;
+  line-height: 20px;
   min-width: 0;
   max-width: 260px;
 }
 
-[data-dsh-simplify-pill]:hover:not(:disabled) {
-  background: var(--dsw-alias-interactive-bg-active);
-  border-color: var(--dsw-alias-border-l2);
-}
-
+[data-dsh-simplify-pill]:hover:not(:disabled),
 [data-dsh-simplify-pill][aria-expanded='true'] {
-  border-color: var(--dsw-alias-state-business-primary);
-  background: var(--dsw-alias-interactive-bg-hover-accent);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 [data-dsh-simplify-pill]:focus-visible {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
-  outline-offset: 1px;
+  outline-offset: -1px;
 }
 
 [data-dsh-simplify-pill]:disabled {
@@ -124,7 +120,6 @@ export const UI_CSS = `
 }
 
 [data-dsh-simplify-control='permission'][data-dsh-simplify-risk='danger'] {
-  border-color: var(--dsw-alias-state-error-secondary);
   color: var(--dsw-alias-label-error);
 }
 
@@ -132,9 +127,7 @@ export const UI_CSS = `
   background: var(--dsw-alias-state-error-primary);
 }
 
-[data-dsh-simplify-control='permission'][data-dsh-simplify-risk='experimental'] {
-  border-color: var(--dsw-alias-state-warn-secondary);
-}
+
 
 [data-dsh-simplify-control='permission'][data-dsh-simplify-risk='experimental'] [data-dsh-simplify-pill-glyph] {
   background: var(--dsw-alias-state-warn-primary);
