@@ -22,6 +22,7 @@ import { mountStatColors } from './stat-colors-mount'
 import { mountTurnDuration } from './turn-duration'
 import { mountDelegationPanel } from './delegation-panel'
 import { mountDockAlign } from './dock-align'
+import { collectUsage } from './usage-rank'
 import { CURRENT_SESSION_KEY, readCurrentSessionId } from './hero-dock'
 import { readArchivedFilter, VIEW_STORE_KEY } from './view-state'
 import { withFallback } from './locale-fallback'
@@ -304,6 +305,7 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
     const hero = mountHeroDock({
       directories: ctx.modelDirectories,
       remote: ctx.remote,
+      usage: () => collectUsage((ctx.sessions?.list.getSnapshot().byId ?? {}) as never),
       sessionOf: (sessionId) => ctx.sessions?.binding(sessionId)?.session,
       permissionValueOf: (sessionId) => {
         const session = ctx.sessions?.binding(sessionId)?.session as
@@ -385,6 +387,7 @@ function registerDock(ctx: ClientCtx): void {
       })
     },
     (entryProps: Record<string, unknown>) => {
+      const usage = () => collectUsage((ctx.sessions?.list.getSnapshot().byId ?? {}) as never)
       const { sessionId, directories, remote, useProjection, session } = entryProps as {
         sessionId: string
         directories: ModelDirectories
@@ -394,7 +397,7 @@ function registerDock(ctx: ClientCtx): void {
       }
       const ref = hooks.useRef<{ sessionId: string; control: ReturnType<typeof createDockControl> } | null>(null)
       if (ref.current === null || ref.current.sessionId !== sessionId) {
-        ref.current = { sessionId, control: createDockControl({ sessionId, directories, remote, useProjection, session, shared }) }
+        ref.current = { sessionId, control: createDockControl({ sessionId, directories, remote, useProjection, session, shared, usage }) }
       }
       return h(ref.current.control as never, {})
     }

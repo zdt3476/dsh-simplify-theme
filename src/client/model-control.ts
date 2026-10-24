@@ -9,6 +9,7 @@
 
 import type { ModelDirectories, ModelSelection, CatalogGroup } from './model-directory'
 import { effortLabel, effortLevels, displayName, orderGroups, providerColor, retainEffort } from './model-directory'
+import { rankCatalog, type UsageRank } from './usage-rank'
 import { effortName, providerName } from './localize'
 import { placePopup, measurePopup } from './popup'
 import { useDismiss } from './dock-shared'
@@ -18,6 +19,8 @@ export interface ModelControlProps {
   sessionId: string
   directories: ModelDirectories
   shared: DockShared
+  /** 打开面板时读取一次用量聚合，用于按使用频率排序。 */
+  usage?: () => UsageRank
 }
 
 export function createModelControl(props: ModelControlProps) {
@@ -40,7 +43,10 @@ export function createModelControl(props: ModelControlProps) {
     const popupRef = hooks.useRef<HTMLElement | null>(null)
     const [pos, setPos] = hooks.useState<{ left: number; top: number } | null>(null)
 
-    const groups: CatalogGroup[] = orderGroups(state.groups)
+    const baseGroups: CatalogGroup[] = orderGroups(state.groups)
+    // 面板打开时才聚合用量（避免每次渲染都扫全量会话），目录展示顺序按真实使用频率。
+    const [usageRank, setUsageRank] = hooks.useState<UsageRank | null>(null)
+    const groups: CatalogGroup[] = usageRank === null ? baseGroups : rankCatalog(baseGroups, usageRank)
     const selection: ModelSelection | null = state.pending ?? state.current
     const name = displayName(groups, selection)
     const group = selection === null ? undefined : groups.find((candidate) => candidate.id === selection.provider)
@@ -83,6 +89,7 @@ export function createModelControl(props: ModelControlProps) {
 
     const openDirectory = () => {
       directory.load().catch(() => {})
+      if (props.usage !== undefined) setUsageRank(props.usage())
       setOpen((prev) => (prev === 'model' ? 'none' : 'model'))
     }
 

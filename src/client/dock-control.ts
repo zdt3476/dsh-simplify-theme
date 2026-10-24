@@ -22,10 +22,11 @@ export interface DockHostProps {
   useProjection: (key: 'permissions') => { currentValue: string } | undefined
   session: () => import('./permission-control').PermissionSession | undefined
   shared: DockShared
+  usage?: () => import('./usage-rank').UsageRank
 }
 
 export function createDockControl(props: DockHostProps) {
-  const model = createModelControl({ sessionId: props.sessionId, directories: props.directories, shared: props.shared })
+  const model = createModelControl({ sessionId: props.sessionId, directories: props.directories, shared: props.shared, usage: props.usage })
   // 组件实例在工厂期创建一次：渲染期重建会丢弹层状态。
   const permission = createPermissionControl({
     sessionId: props.sessionId,
