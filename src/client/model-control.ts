@@ -42,6 +42,7 @@ export function createModelControl(props: ModelControlProps) {
     const [open, setOpen] = hooks.useState<'none' | 'model' | 'effort'>('none')
     const [draftEffort, setDraftEffort] = hooks.useState<string | null>(null)
     const triggerRef = hooks.useRef<HTMLElement | null>(null)
+    const effortRef = hooks.useRef<HTMLElement | null>(null)
     const popupRef = hooks.useRef<HTMLElement | null>(null)
     const [pos, setPos] = hooks.useState<{ left: number; top: number } | null>(null)
 
@@ -71,13 +72,18 @@ export function createModelControl(props: ModelControlProps) {
         setPos(null)
         return
       }
-      const row = triggerRef.current?.closest('[data-composer-dock]') as HTMLElement | null
-      const anchor = row ?? triggerRef.current
       const popup = popupRef.current
-      if (anchor === null || popup === null) return
-      const rect = anchor.getBoundingClientRect()
+      if (popup === null) return
       const size = measurePopup(popup)
-      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, { width: window.innerWidth, height: window.innerHeight }, 'left'))
+      const viewport = { width: window.innerWidth, height: window.innerHeight }
+      // 模型面板宽，沿卡片左缘展开；思考等级是窄弹层，以它自己的按钮为中心。
+      const anchor = open === 'effort'
+        ? effortRef.current
+        : (triggerRef.current?.closest('[data-composer-dock]') as HTMLElement | null) ?? triggerRef.current
+      if (anchor === null) return
+      const rect = anchor.getBoundingClientRect()
+      const align = open === 'effort' ? 'center' : 'left'
+      setPos(placePopup({ left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top }, size, viewport, align))
     }, [open, state.groups.length])
 
     hooks.useEffect(() => {
@@ -123,6 +129,7 @@ export function createModelControl(props: ModelControlProps) {
         disabled: busy,
         ref: (el: HTMLElement | null) => {
           if (kind === 'model') triggerRef.current = el
+          else effortRef.current = el
         },
         onClick: (event: Event) => {
           event.stopPropagation()
