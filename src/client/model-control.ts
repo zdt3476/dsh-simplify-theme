@@ -130,6 +130,7 @@ export function createModelControl(props: ModelControlProps) {
     const modelPill = pill('model', h('span', { 'data-dsh-simplify-pill-label': '' }, modelLabel), providerIndex < 0 || group === undefined ? undefined : providerColor(group.id, providerIndex))
     const children: unknown[] = [modelPill]
 
+    children.push(h('span', { 'data-dsh-simplify-separator': '', 'aria-hidden': 'true' }, '·'))
     children.push(pill('effort', h('span', { 'data-dsh-simplify-pill-label': '' }, effort ?? t('effort.unavailableShort'))))
 
     // 模型列表：平铺放大——一供应商一列，列内模型纵向排列，全目录一屏可见。

@@ -28,7 +28,7 @@ export const UI_CSS = `
   margin-left: auto;
   margin-right: auto;
   /* 与输入卡片之间留出间距，不再紧贴卡片下缘 */
-  margin-top: 8px;
+  margin-top: 5px;
   /* 宿主只在底部留 4px，补到与左右两侧一致的 16px（--dsh-composer-side-clearance） */
   margin-bottom: calc(var(--dsh-composer-side-clearance, 16px) - 4px);
   position: relative;
@@ -836,7 +836,17 @@ export const UI_CSS = `
 [data-dsh-simplify-dock-right] > [data-dsh-simplify-dock-root] {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
+}
+
+/* 模型与思考等级之间的分隔点：两侧留出呼吸间隙，避免贴住按钮描边 */
+[data-dsh-simplify-separator] {
+  flex: none;
+  padding: 0 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 16px;
+  user-select: none;
 }
 [data-dsh-simplify-control='effort'] { flex: none; }
 [data-dsh-simplify-control='model'] { max-width: 240px; }
