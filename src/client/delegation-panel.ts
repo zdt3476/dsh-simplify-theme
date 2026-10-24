@@ -108,10 +108,11 @@ export function paintConnectors(agents: HTMLElement, svg: SVGSVGElement): void {
   const trunkX = 1
   const first = centers[0]
   const last = centers[centers.length - 1]
-  // 主 Agent 的横线落在离主干中点最近的那个分支点上：参考实现里节点等高，
-  // 中点正好等于中间节点的分支高度；我们节点高矮不一，必须显式取最近分支，
-  // 否则会出现两条相差几像素的平行横线。
-  const mid = centers.reduce((best, center) => (Math.abs(center.y - (first.y + last.y) / 2) < Math.abs(best - (first.y + last.y) / 2) ? center.y : best), first.y)
+  // 主 Agent 的横线固定在主干正中。仅当某个分支几乎就在正中（差 8px 内）时用它，
+  // 避免同一高度出现两条平行线；否则保持正中，不吸附到某个子代理分支上。
+  const center = (first.y + last.y) / 2
+  const nearest = centers.reduce((best, c) => (Math.abs(c.y - center) < Math.abs(best - center) ? c.y : best), first.y)
+  const mid = Math.abs(nearest - center) <= 8 ? nearest : center
   const width = box.width + GAP
   svg.setAttribute('viewBox', `${-GAP} 0 ${width} ${box.height}`)
   svg.setAttribute('width', String(width))
