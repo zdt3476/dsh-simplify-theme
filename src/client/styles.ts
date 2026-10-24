@@ -512,7 +512,7 @@ export const UI_CSS = `
 
 .subagent-topology-host {
   display: block;
-  margin: 8px 0;
+  margin: 10px 0;
 }
 
 .subagent-topology {
@@ -532,25 +532,31 @@ export const UI_CSS = `
   min-height: 72px;
   align-items: center;
   gap: 9px;
-  padding: 11px;
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 22%, transparent);
-  border-radius: var(--dsw-radius-md);
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, var(--dsw-alias-bg-layer-2));
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dsw-alias-state-business-primary) 10%, var(--dsw-alias-bg-layer-2)));
 }
 
 .subagent-topology-root-icon,
 .subagent-topology-avatar {
   position: relative;
   display: inline-flex;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   flex: none;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 16%, transparent);
-  color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
 }
+
+.subagent-topology-root-icon { color: var(--dsw-alias-state-business-primary); }
+.subagent-topology-avatar { background: var(--dsw-alias-interactive-bg-active); color: var(--dsw-alias-label-secondary); }
+.subagent-topology-avatar svg,
+.subagent-topology-root-icon svg { width: 14px; height: 14px; }
+.subagent-topology-avatar { box-shadow: 0 0 0 1px var(--dsw-alias-border-l1) inset; }
 
 .subagent-topology-root-copy,
 .subagent-topology-node-copy {
@@ -601,8 +607,8 @@ export const UI_CSS = `
 }
 
 .subagent-topology-lines path {
-  stroke: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
-  stroke-width: 2;
+  stroke: var(--dsw-alias-border-l2);
+  stroke-width: 1.5;
   stroke-linecap: round;
 }
 
@@ -611,7 +617,7 @@ export const UI_CSS = `
   min-width: 0;
   margin: 0;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: var(--dsw-radius-md);
+  border-radius: var(--dsw-radius-lg);
   background: var(--dsw-alias-bg-layer-2);
 }
 
@@ -621,10 +627,10 @@ export const UI_CSS = `
   display: flex;
   width: 100%;
   min-width: 0;
-  min-height: 70px;
+  min-height: 60px;
   align-items: center;
-  gap: 9px;
-  padding: 10px;
+  gap: 10px;
+  padding: 9px 12px;
   border: none;
   border-radius: inherit;
   background: transparent;
@@ -642,14 +648,14 @@ export const UI_CSS = `
 
 .subagent-topology-status-icon {
   position: absolute;
-  right: -3px;
-  bottom: -2px;
+  right: -2px;
+  bottom: -1px;
   display: inline-flex;
-  width: 13px;
-  height: 13px;
+  width: 11px;
+  height: 11px;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--dsw-alias-interactive-bg-active);
+  border: 1.5px solid var(--dsw-alias-bg-layer-2);
   border-radius: 999px;
   background: var(--dsw-alias-label-tertiary);
   color: var(--dsw-alias-bg-base);
@@ -670,19 +676,19 @@ export const UI_CSS = `
 .subagent-topology-node-title-row {
   display: flex;
   min-width: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
-  gap: 3px 8px;
+  gap: 8px;
 }
 
 .subagent-topology-node-title {
   min-width: 0;
-  flex: 1 1 12ch;
+  flex: 0 1 auto;
+  max-width: 52%;
   overflow: hidden;
   color: var(--dsw-alias-label-primary);
   font-size: 13px;
   font-weight: 600;
-  overflow-wrap: anywhere;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -694,7 +700,7 @@ export const UI_CSS = `
   flex: 0 1 auto;
   color: var(--dsw-alias-label-tertiary);
   font-family: var(--dsw-font-family-code, ui-monospace, monospace);
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -732,7 +738,7 @@ export const UI_CSS = `
   margin-top: 3px;
   color: var(--dsw-alias-label-tertiary);
   font-family: var(--dsw-font-family-code, ui-monospace, monospace);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 16px;
   overflow-wrap: anywhere;
   white-space: normal;
