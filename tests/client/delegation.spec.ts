@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { delegationDuration, selectionModel, toDelegationNode } from '../../src/client/delegation-tree'
+import { delegationDuration, selectionEffort, selectionModel, toDelegationNode } from '../../src/client/delegation-tree'
 import { delegationNodesFor, errorReasonOf, formatDelegationDuration, isDelegationTool, pickSubagentIds } from '../../src/client/delegation-panel'
 
 const rows = {
@@ -144,5 +144,15 @@ describe('fallback claiming', () => {
     expect(second).toBe('b')
     claimed.add(second as string)
     expect(Object.entries(rows).find(([id, row]) => row !== undefined && row.origin === 'subagent' && row.parentId === 'p' && !claimed.has(id))).toBeUndefined()
+  })
+})
+
+describe('subagent effort label', () => {
+  it('从模型选择投影取思考等级并本地化', () => {
+    expect(selectionEffort({ next: { reasoningEffort: 'high' } })).toBe('高')
+    expect(selectionEffort({ reasoningEffort: 'low' })).toBe('低')
+    expect(selectionEffort({ next: null })).toBeUndefined()
+    expect(selectionEffort(undefined)).toBeUndefined()
+    expect(selectionEffort({ next: { reasoningEffort: 'custom-level' } })).toBe('custom-level')
   })
 })

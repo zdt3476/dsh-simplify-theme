@@ -6,12 +6,16 @@
  * 这里只做「取哪几行、怎么归纳」，不碰 DOM，便于单测。
  */
 
+import { effortName } from './localize'
+
 export type DelegationStatus = 'running' | 'done' | 'failed' | 'denied'
 
 export interface DelegationNode {
   id: string
   title: string
   model?: string
+  /** 思考等级展示名；目录没给名字时用 id 的中文映射。 */
+  effort?: string
   status: DelegationStatus
   durationMs?: number
   steps?: number
@@ -27,7 +31,7 @@ export interface SessionRow {
   origin?: string
   projectionValues?: {
     // 投影线上视图是 { lastUsed, next }；next 才代表当前生效的选择。
-    modelSelection?: { provider?: string; model?: string } | { next?: { provider?: string; model?: string } | null }
+    modelSelection?: { provider?: string; model?: string; reasoningEffort?: string } | { next?: { provider?: string; model?: string; reasoningEffort?: string } | null }
     sessionStats?: { steps?: number }
     subagentTiming?: { settledMs?: number; active?: { since?: number } }
   }
@@ -66,14 +70,23 @@ export function selectionModel(selection: { model?: string; next?: { model?: str
   return typeof model === 'string' && model !== '' ? model : undefined
 }
 
+/** 思考等级：投影视图的 next.reasoningEffort，转成中文名。 */
+export function selectionEffort(selection: { reasoningEffort?: string; next?: { reasoningEffort?: string } | null } | undefined): string | undefined {
+  const id = selection?.next?.reasoningEffort ?? selection?.reasoningEffort
+  if (id === undefined || id === '') return undefined
+  return effortName(id, undefined)
+}
+
 /** 单个会话行 → 委派节点；不是子代理行时返回 null。 */
 export function toDelegationNode(id: string, row: SessionRow | undefined, now: number): DelegationNode | null {
   if (row === undefined || row.origin !== 'subagent') return null
   const model = selectionModel(row.projectionValues?.modelSelection)
+  const effort = selectionEffort(row.projectionValues?.modelSelection)
   return {
     id,
     title: row.displayTitle ?? row.title ?? id,
     ...(model === undefined || model === '' ? {} : { model }),
+    ...(effort === undefined ? {} : { effort }),
     status: row.running === true ? 'running' : 'done',
     ...((): { durationMs?: number } => {
       const duration = delegationDuration(row.projectionValues?.subagentTiming, now)

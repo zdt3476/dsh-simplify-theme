@@ -533,9 +533,9 @@ export const UI_CSS = `
   align-items: center;
   gap: 9px;
   padding: 11px;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 22%, transparent);
   border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-interactive-bg-hover);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, var(--dsw-alias-bg-layer-2));
 }
 
 .subagent-topology-root-icon,
@@ -548,8 +548,8 @@ export const UI_CSS = `
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: var(--dsw-alias-interactive-bg-active);
-  color: var(--dsw-alias-label-secondary);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 16%, transparent);
+  color: var(--dsw-alias-state-business-primary);
 }
 
 .subagent-topology-root-copy,
@@ -690,12 +690,9 @@ export const UI_CSS = `
   color: var(--dsw-alias-label-primary);
   font-size: 13px;
   font-weight: 600;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
   overflow-wrap: anywhere;
-  white-space: normal;
-  word-break: break-word;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .subagent-topology-node-model {
@@ -710,6 +707,7 @@ export const UI_CSS = `
 }
 
 .subagent-topology-node-model-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.subagent-topology-node-thinking { flex: none; white-space: pre; color: var(--dsw-alias-label-secondary); }
 
 .subagent-topology-node-status {
   flex: none;

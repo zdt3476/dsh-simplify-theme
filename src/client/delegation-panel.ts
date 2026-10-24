@@ -159,10 +159,11 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     const copy = el('span', 'subagent-topology-node-copy')
     const titleRow = el('span', 'subagent-topology-node-title-row')
     titleRow.append(head(displayTitleOf(node, index), 'subagent-topology-node-title'))
-    if (node.model !== undefined) {
+    if (node.model !== undefined || node.effort !== undefined) {
       const model = el('span', 'subagent-topology-node-model')
-      model.title = node.model
-      model.append(head(node.model, 'subagent-topology-node-model-name'))
+      model.title = [node.model ?? '', node.effort ?? ''].filter(Boolean).join(' · ')
+      if (node.model !== undefined) model.append(head(node.model, 'subagent-topology-node-model-name'))
+      if (node.effort !== undefined) model.append(head(` ${node.effort}`, 'subagent-topology-node-thinking'))
       titleRow.append(model)
     }
     const stateText = node.status === 'running'
@@ -222,10 +223,13 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
       const first = agents.firstElementChild as HTMLElement | null
       const last = agents.lastElementChild as HTMLElement | null
       if (first === null || last === null) return
-      const top = first.offsetTop + first.offsetHeight / 2
-      const bottom = agents.offsetHeight - (last.offsetTop + last.offsetHeight / 2)
-      agents.style.setProperty('--dsh-simplify-trunk-top', `${Math.max(0, top)}px`)
-      agents.style.setProperty('--dsh-simplify-trunk-bottom', `${Math.max(0, bottom)}px`)
+      const trunkTop = first.offsetTop + first.offsetHeight / 2
+      const trunkBottom = last.offsetTop + last.offsetHeight / 2
+      agents.style.setProperty('--dsh-simplify-trunk-top', `${Math.max(0, trunkTop)}px`)
+      agents.style.setProperty('--dsh-simplify-trunk-bottom', `${Math.max(0, agents.offsetHeight - trunkBottom)}px`)
+      // 连接线要对准主干中点，而不是整块图形的中点：节点高矮不一时这两者不同。
+      const offset = (trunkTop + trunkBottom) / 2 - agents.offsetHeight / 2
+      connector.style.transform = `translateY(${Math.round(offset)}px)`
     })
     return section
   }
