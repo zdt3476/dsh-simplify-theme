@@ -577,10 +577,7 @@ export const UI_CSS = `
 }
 
 /* 网格里保留这一列做间距；真正的横线由主干 ::after 画，保证与竖直段同源 */
-.subagent-topology-connector {
-  height: 2px;
-  background: transparent;
-}
+.subagent-topology-connector { height: 2px; background: transparent; }
 
 .subagent-topology-agents {
   position: relative;
@@ -590,27 +587,23 @@ export const UI_CSS = `
   padding-left: 14px;
 }
 
-.subagent-topology-agents::before {
-  content: '';
-  position: absolute;
-  top: var(--dsh-simplify-trunk-top, 36px);
-  bottom: var(--dsh-simplify-trunk-bottom, 36px);
-  left: 0;
-  width: 2px;
-  border-radius: 999px;
-  background: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
+/* 连线由 SVG 按真实几何绘制，见 paintConnectors */
+.subagent-topology-agents {
+  --unused: 0;
 }
 
-/* 主 Agent → 主干的横线：位置取主干中点，宽度跨越整个间距列 */
-.subagent-topology-agents::after {
-  content: '';
+.subagent-topology-lines {
   position: absolute;
-  top: var(--dsh-simplify-trunk-mid, 50%);
+  top: 0;
   left: -34px;
-  width: 34px;
-  height: 2px;
-  transform: translateY(-1px);
-  background: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
+  overflow: visible;
+  pointer-events: none;
+}
+
+.subagent-topology-lines path {
+  stroke: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
 .subagent-topology-node {
@@ -620,17 +613,6 @@ export const UI_CSS = `
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-2);
-}
-
-.subagent-topology-node::before {
-  content: '';
-  position: absolute;
-  /* 分支线落在节点垂直中线，和内容居中一致 */
-  top: calc(50% - 1px);
-  right: 100%;
-  width: 15px;
-  height: 2px;
-  background: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
 }
 
 .subagent-topology-node-actions { position: relative; }

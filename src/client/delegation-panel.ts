@@ -90,6 +90,42 @@ export interface DelegationPanelHandle {
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
+/** 主干左侧预留的间距（与参考实现的 34px 连接列一致）。 */
+const GAP = 34
+
+/**
+ * 按真实几何画连线：主干 + 每个节点的分支 + 主 Agent 的横线。
+ * 用测量的像素坐标绘制，不依赖任何写死偏移，节点高矮不一也不会错开。
+ */
+export function paintConnectors(agents: HTMLElement, svg: SVGSVGElement): void {
+  const box = agents.getBoundingClientRect()
+  const nodes = [...agents.children].filter((child): child is HTMLElement => child instanceof HTMLElement && !child.hasAttribute('data-dsh-simplify-lines'))
+  if (nodes.length === 0) return
+  const centers = nodes.map((node) => {
+    const rect = node.getBoundingClientRect()
+    return { y: rect.top - box.top + rect.height / 2, left: rect.left - box.left }
+  })
+  const trunkX = 1
+  const first = centers[0]
+  const last = centers[centers.length - 1]
+  // 主 Agent 的横线落在离主干中点最近的那个分支点上：参考实现里节点等高，
+  // 中点正好等于中间节点的分支高度；我们节点高矮不一，必须显式取最近分支，
+  // 否则会出现两条相差几像素的平行横线。
+  const mid = centers.reduce((best, center) => (Math.abs(center.y - (first.y + last.y) / 2) < Math.abs(best - (first.y + last.y) / 2) ? center.y : best), first.y)
+  const width = box.width + GAP
+  svg.setAttribute('viewBox', `${-GAP} 0 ${width} ${box.height}`)
+  svg.setAttribute('width', String(width))
+  svg.setAttribute('height', String(box.height))
+  const d: string[] = [
+    // 主 Agent → 主干
+    `M ${-GAP + 1} ${mid} H ${trunkX}`,
+    // 主干
+    `M ${trunkX} ${first.y} V ${last.y}`
+  ]
+  for (const center of centers) d.push(`M ${trunkX} ${center.y} H ${center.left}`)
+  const path = svg.querySelector('path')
+  if (path !== null) path.setAttribute('d', d.join(' '))
+}
 
 function icon(paths: string[], size: number): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg')
@@ -122,6 +158,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
 
   const hosts = new WeakMap<Element, HTMLElement>()
   const refreshed = new Set<string>()
+  const painters = new Set<() => void>()
   let ticker: number | undefined
   let frame = 0
   let debug = false
@@ -217,20 +254,19 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     const agents = el('div', 'subagent-topology-agents')
     agents.setAttribute('role', 'list')
     members.forEach((member, index) => agents.append(nodeView(member, index)))
+    const svg = document.createElementNS(SVG_NS, 'svg')
+    svg.setAttribute('data-dsh-simplify-lines', '')
+    svg.setAttribute('aria-hidden', 'true')
+    svg.setAttribute('class', 'subagent-topology-lines')
+    const path = document.createElementNS(SVG_NS, 'path')
+    path.setAttribute('fill', 'none')
+    svg.append(path)
+    agents.append(svg)
     section.append(root, connector, agents)
-    // 主干只连首末节点的分支点：固定 36px 会在高矮不一的节点外留出悬空线头。
-    queueMicrotask(() => {
-      const first = agents.firstElementChild as HTMLElement | null
-      const last = agents.lastElementChild as HTMLElement | null
-      if (first === null || last === null) return
-      const trunkTop = first.offsetTop + first.offsetHeight / 2
-      const trunkBottom = last.offsetTop + last.offsetHeight / 2
-      agents.style.setProperty('--dsh-simplify-trunk-top', `${Math.max(0, trunkTop)}px`)
-      agents.style.setProperty('--dsh-simplify-trunk-bottom', `${Math.max(0, agents.offsetHeight - trunkBottom)}px`)
-      // 连接线要对准主干中点，而不是整块图形的中点：节点高矮不一时这两者不同。
-      // 主连接线也交给主干自己画（agents::after），两者共用同一组坐标，不会错开。
-      agents.style.setProperty('--dsh-simplify-trunk-mid', `${Math.round((trunkTop + trunkBottom) / 2)}px`)
-    })
+    // 连线全部由 paintConnectors 按真实几何绘制，节点高矮不一也不会错位。
+    const repaint = () => paintConnectors(agents, svg)
+    painters.add(repaint)
+    window.requestAnimationFrame(repaint)
     return section
   }
 
@@ -344,6 +380,17 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     })
   }
 
+  const repaintAll = () => {
+    for (const paint of painters) {
+      try {
+        paint()
+      } catch {
+        // 节点已被移除时跳过
+      }
+    }
+  }
+  window.addEventListener('resize', repaintAll)
+
   const unsubscribe = options.sessions.subscribe(schedule)
   const observer = new MutationObserver(schedule)
   observer.observe(document.body, { childList: true, subtree: true })
@@ -353,6 +400,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     dispose: () => {
       unsubscribe()
       observer.disconnect()
+      window.removeEventListener('resize', repaintAll)
       if (ticker !== undefined) window.clearInterval(ticker)
       if (frame !== 0) window.cancelAnimationFrame(frame)
       for (const host of document.querySelectorAll('.subagent-topology-host')) host.remove()
