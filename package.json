@@ -1,6 +1,6 @@
 {
   "name": "dsh-simplify-theme",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": false,
   "publishConfig": {
     "access": "public"
@@ -23,6 +23,7 @@
     "lib/client.js",
     "cordis.patch.yml",
     "README.md",
+    "docs/images/*.png",
     "LICENSE"
   ],
   "dsh": {
