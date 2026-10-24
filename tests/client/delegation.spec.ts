@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { delegationDuration, selectionModel, toDelegationNode } from '../../src/client/delegation-tree'
-import { delegationNodesFor, formatDelegationDuration, isDelegationTool, pickSubagentIds } from '../../src/client/delegation-panel'
+import { delegationNodesFor, errorReasonOf, formatDelegationDuration, isDelegationTool, pickSubagentIds } from '../../src/client/delegation-panel'
 
 const rows = {
   child1: {
@@ -112,5 +112,19 @@ describe('model selection shapes', () => {
     expect(selectionModel({ model: 'plain' })).toBe('plain')
     expect(selectionModel({ next: null })).toBeUndefined()
     expect(selectionModel(undefined)).toBeUndefined()
+  })
+})
+
+describe('failure reason', () => {
+  it('取错误输出里的第一行并截断', () => {
+    const row = {
+      querySelector: (selector: string) => (selector === '[data-error]' ? { textContent: '\n  超出配额\n第二行' } : null)
+    } as unknown as Element
+    expect(errorReasonOf(row)).toBe('超出配额')
+    const long = {
+      querySelector: () => ({ textContent: 'x'.repeat(400) })
+    } as unknown as Element
+    expect(errorReasonOf(long)?.length).toBe(160)
+    expect(errorReasonOf(null)).toBeUndefined()
   })
 })

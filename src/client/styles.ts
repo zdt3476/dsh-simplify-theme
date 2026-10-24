@@ -519,6 +519,8 @@ export const UI_CSS = `
 [data-dsh-simplify-delegations-card] {
   --dsh-simplify-status: var(--dsw-alias-state-success-primary);
   box-sizing: border-box;
+  display: flex;
+  align-items: stretch;
   width: min(420px, 100%);
   padding-left: 3px;
   border: 1px solid var(--dsw-alias-border-l1);
@@ -537,6 +539,8 @@ export const UI_CSS = `
 
 [data-dsh-simplify-delegation-open] {
   appearance: none;
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -610,128 +614,40 @@ export const UI_CSS = `
 [data-dsh-simplify-delegation-state][data-status='failed'],
 [data-dsh-simplify-delegation-state][data-status='denied'] { color: var(--dsw-alias-state-error-primary); }
 
+[data-dsh-simplify-delegation-reason] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 11px;
+}
+
+[data-dsh-simplify-delegation-stop] {
+  appearance: none;
+  flex: none;
+  align-self: center;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+[data-dsh-simplify-delegation-stop]:hover {
+  border-color: var(--dsw-alias-state-error-secondary);
+  color: var(--dsw-alias-state-error-primary);
+}
+
 [data-dsh-simplify-delegation-meta] {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* —— 子代理总览：与 TODO 同排，各占一半 —— */
-[data-slot='conversation.input.dock'] {
-  display: flex !important;
-  align-items: stretch;
-  gap: 8px;
-  min-width: 0;
-}
-
-[data-slot='conversation.input.dock'] > * {
-  min-width: 0;
-}
-
-[data-slot='conversation.input.dock'] > [data-testid='todo-panel'],
-[data-slot='conversation.input.dock'] > [data-dsh-simplify-overview-host] {
-  flex: 1 1 0;
-}
-
-[data-dsh-simplify-overview-host] { display: block; }
-
-[data-dsh-simplify-subagent-overview] {
-  box-sizing: border-box;
-  height: 100%;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-2);
-  overflow: hidden;
-}
-
-[data-dsh-simplify-overview-head] {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 6px 10px;
-  border: none;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-
-[data-dsh-simplify-overview-head]:hover { background: var(--dsw-alias-interactive-bg-hover); }
-
-[data-dsh-simplify-overview-chevron] {
-  flex: none;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 5px solid var(--dsw-alias-label-caption);
-  transition: transform 0.12s ease;
-}
-
-[data-dsh-simplify-subagent-overview][data-collapsed='true'] [data-dsh-simplify-overview-chevron] {
-  transform: rotate(-90deg);
-}
-
-[data-dsh-simplify-overview-title] { font-weight: 600; color: var(--dsw-alias-label-primary); }
-[data-dsh-simplify-overview-summary] { margin-left: auto; color: var(--dsw-alias-label-tertiary); font-variant-numeric: tabular-nums; }
-
-[data-dsh-simplify-overview-list] {
-  margin: 0;
-  padding: 0 4px 4px;
-  list-style: none;
-  max-height: 180px;
-  overflow: auto;
-}
-
-[data-dsh-simplify-overview-open] {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 5px 6px;
-  border: none;
-  border-radius: var(--dsw-radius-sm);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-
-[data-dsh-simplify-overview-open]:hover { background: var(--dsw-alias-interactive-bg-hover); }
-
-[data-dsh-simplify-overview-dot] {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--dsw-alias-state-success-primary);
-}
-
-[data-dsh-simplify-overview-dot][data-status='running'] { background: var(--dsw-alias-state-business-primary); }
-[data-dsh-simplify-overview-dot][data-status='failed'],
-[data-dsh-simplify-overview-dot][data-status='denied'] { background: var(--dsw-alias-state-error-primary); }
-
-[data-dsh-simplify-overview-label] {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--dsw-alias-label-primary);
-}
-
-[data-dsh-simplify-overview-meta] {
-  margin-left: auto;
-  flex: none;
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
   font-variant-numeric: tabular-nums;

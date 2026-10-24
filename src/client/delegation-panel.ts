@@ -51,6 +51,14 @@ export function formatDelegationDuration(ms: number, locale: (key: string) => st
 
 export type Abnormal = 'failed' | 'denied' | null
 
+/** 从工具行的错误输出里取一行失败原因；没有就返回 undefined。 */
+export function errorReasonOf(row: Element | null, limit = 160): string | undefined {
+  const text = row?.querySelector('[data-error]')?.textContent?.trim()
+  if (text === undefined || text === '') return undefined
+  const line = text.split(/\r?\n/).map((part) => part.trim()).find((part) => part !== '') ?? text
+  return line.length > limit ? `${line.slice(0, limit - 1)}…` : line
+}
+
 /**
  * 一条工具行 → 一张卡要展示的节点。
  * 行的 `data-state` 决定异常态；一次调用只派一个子代理，取第一个可用 id。
@@ -73,6 +81,9 @@ export interface DelegationPanelOptions {
   currentSessionId: () => string | undefined
   locale: (key: string, params?: Record<string, string | number>) => string
   openSession: (sessionId: string) => void
+  /** 子会话是否可取消（客户端已持有其实例）；为真的运行中卡片显示停止按钮。 */
+  canCancel?: (sessionId: string) => boolean
+  cancelSession?: (sessionId: string) => void
 }
 
 export interface DelegationPanelHandle {
@@ -94,7 +105,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
   let ticker: number | undefined
   let frame = 0
 
-  const card = (node: DelegationNode, index: number): HTMLElement => {
+  const card = (node: DelegationNode, index: number, reason: string | undefined): HTMLElement => {
     const wrapper = element('div', { [`${HOST_ATTR}-card`]: '', 'data-status': node.status })
     const open = element('button', { type: 'button', 'data-dsh-simplify-delegation-open': '', title: options.locale('delegation.open') })
     const dot = element('span', { 'data-dsh-simplify-delegation-icon': '', 'data-status': node.status, 'aria-hidden': 'true' })
@@ -116,9 +127,25 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
       node.steps === undefined ? null : options.locale('delegation.stepsShort', { count: node.steps })
     ].filter((part): part is string => part !== null && part !== '').join(' · ')
     body.append(head, meta)
+    if (reason !== undefined && node.status !== 'running' && node.status !== 'done') {
+      const note = element('span', { 'data-dsh-simplify-delegation-reason': '' })
+      note.textContent = reason
+      note.title = reason
+      body.append(note)
+    }
     open.append(dot, body)
     open.addEventListener('click', () => options.openSession(node.id))
     wrapper.append(open)
+    // 只有客户端确实持有该子会话时才给停止按钮，避免点了没反应。
+    if (node.status === 'running' && options.cancelSession !== undefined && options.canCancel?.(node.id) === true) {
+      const stop = element('button', { type: 'button', 'data-dsh-simplify-delegation-stop': '', title: options.locale('delegation.stop') })
+      stop.textContent = options.locale('delegation.stopLabel')
+      stop.addEventListener('click', (event) => {
+        event.stopPropagation()
+        options.cancelSession?.(node.id)
+      })
+      wrapper.append(stop)
+    }
     return wrapper
   }
 
@@ -154,7 +181,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
           parent.insertBefore(host, anchor.nextSibling)
         }
         row.setAttribute(SOURCE_ATTR, '')
-        const content = card(nodes[0], index++)
+        const content = card(nodes[0], index++, abnormal === null ? undefined : errorReasonOf(row))
         const signature = `${nodes[0].id}|${nodes[0].status}|${nodes[0].steps ?? -1}|${Math.round((nodes[0].durationMs ?? 0) / 1000)}|${nodes[0].model ?? ''}`
         if (host.dataset.signature !== signature) {
           host.dataset.signature = signature
