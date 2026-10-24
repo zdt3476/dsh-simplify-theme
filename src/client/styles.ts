@@ -507,127 +507,269 @@ export const UI_CSS = `
   font-weight: 600;
 }
 
-/* —— 子代理委派卡片（一次委派一张，固定宽度居中） —— */
+/* —— 子代理委派图（结构照 PI-Desktop SubagentTopology） —— */
 [data-dsh-simplify-delegation-source] { display: none !important; }
 
-[data-dsh-simplify-delegations-host] {
-  display: flex;
-  justify-content: center;
+.subagent-topology-host {
+  display: block;
   margin: 8px 0;
 }
 
-[data-dsh-simplify-delegations-card] {
-  --dsh-simplify-status: var(--dsw-alias-state-success-primary);
+.subagent-topology {
+  display: grid;
   box-sizing: border-box;
-  display: flex;
-  align-items: stretch;
-  width: min(420px, 100%);
-  padding-left: 3px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-left: 3px solid var(--dsh-simplify-status);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-2);
-  overflow: hidden;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  min-width: 0;
+  max-width: 640px;
+  margin: 0 auto;
+  grid-template-columns: minmax(138px, 0.58fr) 34px minmax(248px, 1.42fr);
+  align-items: center;
+  padding: 8px 0;
 }
 
-[data-dsh-simplify-delegations-card][data-status='running'] { --dsh-simplify-status: var(--dsw-alias-state-business-primary); }
-[data-dsh-simplify-delegations-card][data-status='failed'],
-[data-dsh-simplify-delegations-card][data-status='denied'] { --dsh-simplify-status: var(--dsw-alias-state-error-primary); }
-
-[data-dsh-simplify-delegations-card]:hover { background: var(--dsw-alias-interactive-bg-hover); }
-
-[data-dsh-simplify-delegation-open] {
-  appearance: none;
-  flex: 1 1 auto;
-  min-width: 0;
+.subagent-topology-root {
   display: flex;
+  min-width: 0;
+  min-height: 72px;
   align-items: flex-start;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.subagent-topology-root-icon,
+.subagent-topology-avatar {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.subagent-topology-root-copy,
+.subagent-topology-node-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.subagent-topology-root-copy > [data-dsh-simplify-root-title] {
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-topology-root-copy > span {
+  margin-top: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.subagent-topology-connector {
+  height: 2px;
+  border-radius: 999px;
+  background: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
+}
+
+.subagent-topology-agents {
+  position: relative;
+  display: grid;
+  min-width: 0;
   gap: 10px;
+  padding-left: 14px;
+}
+
+.subagent-topology-agents::before {
+  content: '';
+  position: absolute;
+  top: 36px;
+  bottom: 36px;
+  left: 0;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
+}
+
+.subagent-topology-node {
+  position: relative;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.subagent-topology-node::before {
+  content: '';
+  position: absolute;
+  top: 35px;
+  right: 100%;
+  width: 15px;
+  height: 2px;
+  background: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
+}
+
+.subagent-topology-node-actions { position: relative; }
+
+.subagent-topology-node-header {
+  display: flex;
   width: 100%;
-  padding: 10px 12px;
+  min-width: 0;
+  min-height: 70px;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px;
   border: none;
+  border-radius: inherit;
   background: transparent;
-  color: inherit;
+  color: var(--dsw-alias-label-secondary);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-[data-dsh-simplify-delegation-open]:hover { background: var(--dsw-alias-interactive-bg-hover); }
-[data-dsh-simplify-delegation-open]:focus-visible {
+.subagent-topology-node-header:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.subagent-topology-node-header:focus-visible {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: -2px;
 }
 
-[data-dsh-simplify-delegation-icon] {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  margin-top: 5px;
-  border-radius: 50%;
-  background: var(--dsw-alias-state-success-primary);
+.subagent-topology-status-icon {
+  position: absolute;
+  right: -3px;
+  bottom: -2px;
+  display: inline-flex;
+  width: 13px;
+  height: 13px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--dsw-alias-interactive-bg-active);
+  border-radius: 999px;
+  background: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-bg-base);
 }
 
-[data-dsh-simplify-delegation-icon][data-status='running'] { background: var(--dsw-alias-state-business-primary); }
-[data-dsh-simplify-delegation-icon][data-status='failed'],
-[data-dsh-simplify-delegation-icon][data-status='denied'] { background: var(--dsw-alias-state-error-primary); }
+.subagent-topology-status-icon > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+}
 
-[data-dsh-simplify-delegation-body] {
+.subagent-topology-node.outcome-completed .subagent-topology-status-icon { background: var(--dsw-alias-state-success-primary); }
+.subagent-topology-node.outcome-failed .subagent-topology-status-icon { background: var(--dsw-alias-state-error-primary); }
+.subagent-topology-node.outcome-denied .subagent-topology-status-icon { background: var(--dsw-alias-label-tertiary); }
+.subagent-topology-node.outcome-running .subagent-topology-status-icon { background: var(--dsw-alias-state-business-primary); }
+
+.subagent-topology-node-title-row {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
   min-width: 0;
-  flex: 1 1 auto;
-}
-
-[data-dsh-simplify-delegation-headline] {
-  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
-  min-width: 0;
+  gap: 3px 8px;
 }
 
-[data-dsh-simplify-delegation-title] {
-  flex: 1 1 auto;
+.subagent-topology-node-title {
   min-width: 0;
+  flex: 1 1 12ch;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--dsw-alias-label-primary);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
 }
 
-[data-dsh-simplify-delegation-state] {
-  flex: none;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, currentColor 12%, transparent);
-  font-size: 11px;
-  line-height: 17px;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-[data-dsh-simplify-delegation-state][data-status='running'] { color: var(--dsw-alias-state-business-primary); }
-[data-dsh-simplify-delegation-state][data-status='done'] { color: var(--dsw-alias-state-success-primary); }
-[data-dsh-simplify-delegation-state][data-status='failed'],
-[data-dsh-simplify-delegation-state][data-status='denied'] { color: var(--dsw-alias-state-error-primary); }
-
-[data-dsh-simplify-delegation-reason] {
+.subagent-topology-node-model {
+  display: inline-flex;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: 100%;
+  flex: 0 1 auto;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--dsw-font-family-code, ui-monospace, monospace);
+  font-size: 10px;
   white-space: nowrap;
+}
+
+.subagent-topology-node-model-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.subagent-topology-node-status {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--dsw-font-family-code, ui-monospace, monospace);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.subagent-topology-node.outcome-running .subagent-topology-node-status { color: var(--dsw-alias-state-business-primary); }
+.subagent-topology-node.outcome-failed .subagent-topology-node-status { color: var(--dsw-alias-state-error-primary); }
+
+.subagent-topology-node-summary {
+  display: -webkit-box;
+  min-width: 0;
+  margin-top: 4px;
+  overflow: hidden;
   color: var(--dsw-alias-state-error-primary);
   font-size: 11px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  word-break: break-word;
 }
 
-[data-dsh-simplify-delegation-stop] {
-  appearance: none;
+.subagent-topology-node-steps {
+  min-width: 0;
+  margin-top: 3px;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--dsw-font-family-code, ui-monospace, monospace);
+  font-size: 10px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.subagent-topology-spinner {
   flex: none;
-  align-self: center;
-  margin-right: 8px;
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 999px;
+  border: 1.5px solid var(--dsw-alias-border-l2);
+  border-top-color: var(--dsw-alias-state-business-primary);
+  animation: dsh-simplify-spin 0.9s linear infinite;
+}
+
+@keyframes dsh-simplify-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .subagent-topology-spinner { animation: none; }
+}
+
+.subagent-stop-button {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
   padding: 2px 8px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 999px;
@@ -635,23 +777,17 @@ export const UI_CSS = `
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
   line-height: 16px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-[data-dsh-simplify-delegation-stop]:hover {
+.subagent-stop-button:hover {
   border-color: var(--dsw-alias-state-error-secondary);
   color: var(--dsw-alias-state-error-primary);
 }
 
-[data-dsh-simplify-delegation-meta] {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
+.subagent-topology-node-actions:has(> .subagent-stop-button) .subagent-topology-node-header { min-height: 88px; }
+.subagent-topology-node-actions:has(> .subagent-stop-button) :is(.subagent-topology-node-summary, .subagent-topology-node-steps) { padding-right: 100px; }
 
 /* —— 回合耗时 —— */
 [data-dsh-simplify-duration] {

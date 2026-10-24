@@ -1,29 +1,29 @@
 /**
- * 回合内的子代理卡片（一次委派一张）。
+ * 回合内的子代理委派图（复刻 PI-Desktop 的 SubagentTopology）。
  *
- * 参考 PI-Desktop 的单层图思路，但按实际操作粒度落位：每一条 `subagent` 工具
- * 调用就是一次委派，就在它出现的位置插一张卡，不把同一回合的多次委派合并成一张。
+ * 结构：左「主 Agent」卡片 → 连接线 → 右侧子代理节点列表（每个节点带状态角标、
+ * 名称、模型、状态·耗时、摘要、步数）。
  *
- * 数据：会话列表快照里的子会话行（标题、模型、步骤、耗时、运行状态），失败/拒绝
- * 读工具行的 `data-state`。卡片固定宽度、水平居中，避免在宽窗口下拉成一条长横条。
+ * 分组：同一回合里连续出现的委派算一批（一次扇出），中间插入了别的工具调用就
+ * 另起一张图，避免把不相干的委派粘在一起。
+ *
+ * 数据来自会话列表快照；失败原因取工具行的错误输出；运行中的节点提供停止按钮。
  */
 
 import { toDelegationNode, type DelegationNode, type SessionRows } from './delegation-tree'
 
 const TURN = '[data-chat-turn]'
 const TOOL_ROW = '[data-tool]'
+const NODE_KEY = '[data-chat-node-key]'
 const HOST_ATTR = 'data-dsh-simplify-delegations'
-/** 被卡片取代的原生工具行。 */
 const SOURCE_ATTR = 'data-dsh-simplify-delegation-source'
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 const UUID_ONLY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-/** 委派类工具的 `data-tool` 名称；dsh-tool-subagent 默认叫 subagent。 */
 export function isDelegationTool(name: string | null): boolean {
   return name !== null && /(^|[_-])subagent([_-]|$)/i.test(name)
 }
 
-/** 一行文本里出现的、确实属于本会话子代理的 id。 */
 export function pickSubagentIds(text: string, rows: SessionRows, parentId: string | undefined): string[] {
   const ids: string[] = []
   for (const match of text.matchAll(UUID)) {
@@ -35,12 +35,10 @@ export function pickSubagentIds(text: string, rows: SessionRows, parentId: strin
   return ids
 }
 
-/** 标题拿到的是裸 id 时改用序号，避免卡片上出现 UUID。 */
 export function displayTitleOf(node: DelegationNode, index: number): string {
   return UUID_ONLY.test(node.title) ? `子代理 ${index + 1}` : node.title
 }
 
-/** 秒/分可读耗时。 */
 export function formatDelegationDuration(ms: number, locale: (key: string) => string): string {
   const seconds = Math.round(ms / 100) / 10
   if (seconds < 60) return `${seconds}${locale('duration.s')}`
@@ -51,7 +49,6 @@ export function formatDelegationDuration(ms: number, locale: (key: string) => st
 
 export type Abnormal = 'failed' | 'denied' | null
 
-/** 从工具行的错误输出里取一行失败原因；没有就返回 undefined。 */
 export function errorReasonOf(row: Element | null, limit = 160): string | undefined {
   const text = row?.querySelector('[data-error]')?.textContent?.trim()
   if (text === undefined || text === '') return undefined
@@ -59,10 +56,7 @@ export function errorReasonOf(row: Element | null, limit = 160): string | undefi
   return line.length > limit ? `${line.slice(0, limit - 1)}…` : line
 }
 
-/**
- * 一条工具行 → 一张卡要展示的节点。
- * 行的 `data-state` 决定异常态；一次调用只派一个子代理，取第一个可用 id。
- */
+/** 一次工具行 → 一个节点；行的 data-state 决定异常态。 */
 export function delegationNodesFor(ids: readonly string[], abnormal: Abnormal, rows: SessionRows, now = Date.now()): DelegationNode[] {
   for (const id of ids) {
     const node = toDelegationNode(id, rows[id], now)
@@ -70,6 +64,12 @@ export function delegationNodesFor(ids: readonly string[], abnormal: Abnormal, r
     return [abnormal === null ? node : { ...node, status: abnormal }]
   }
   return []
+}
+
+/** 一批委派的成员：节点 + 失败原因。 */
+export interface BatchMember {
+  node: DelegationNode
+  reason?: string
 }
 
 export interface DelegationPanelOptions {
@@ -81,7 +81,6 @@ export interface DelegationPanelOptions {
   currentSessionId: () => string | undefined
   locale: (key: string, params?: Record<string, string | number>) => string
   openSession: (sessionId: string) => void
-  /** 子会话是否可取消（客户端已持有其实例）；为真的运行中卡片显示停止按钮。 */
   canCancel?: (sessionId: string) => boolean
   cancelSession?: (sessionId: string) => void
 }
@@ -90,64 +89,135 @@ export interface DelegationPanelHandle {
   dispose: () => void
 }
 
-function element<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string>): HTMLElementTagNameMap[K] {
+const SVG_NS = 'http://www.w3.org/2000/svg'
+
+function icon(paths: string[], size: number): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, 'svg')
+  svg.setAttribute('viewBox', '0 0 16 16')
+  svg.setAttribute('width', String(size))
+  svg.setAttribute('height', String(size))
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('stroke', 'currentColor')
+  svg.setAttribute('stroke-width', '1.2')
+  svg.setAttribute('aria-hidden', 'true')
+  for (const d of paths) {
+    const path = document.createElementNS(SVG_NS, 'path')
+    path.setAttribute('d', d)
+    svg.append(path)
+  }
+  return svg
+}
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag)
-  for (const [name, value] of Object.entries(attrs)) node.setAttribute(name, value)
+  if (cls !== undefined) node.className = cls
   return node
 }
+
+const ICON_TARGET = ['M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2', 'M8 5a3 3 0 100 6 3 3 0 000-6z']
+const ICON_BOT = ['M4 5.5h8a1.5 1.5 0 011.5 1.5v4A1.5 1.5 0 0112 12.5H4A1.5 1.5 0 012.5 11V7A1.5 1.5 0 014 5.5z', 'M8 3v2.5', 'M6 8.5h.01M10 8.5h.01']
 
 export function mountDelegationPanel(options: DelegationPanelOptions): DelegationPanelHandle | null {
   if (typeof document === 'undefined') return null
 
-  // 工具行 → 卡片宿主，行消失时跟着回收。
   const hosts = new WeakMap<Element, HTMLElement>()
   const refreshed = new Set<string>()
-  let debug = false
   let ticker: number | undefined
   let frame = 0
+  let debug = false
+  try {
+    debug = localStorage.getItem('dsh-simplify-theme.debug') === '1'
+  } catch {
+    debug = false
+  }
 
-  const card = (node: DelegationNode, index: number, reason: string | undefined): HTMLElement => {
-    const wrapper = element('div', { [`${HOST_ATTR}-card`]: '', 'data-status': node.status })
-    const open = element('button', { type: 'button', 'data-dsh-simplify-delegation-open': '', title: options.locale('delegation.open') })
-    const dot = element('span', { 'data-dsh-simplify-delegation-icon': '', 'data-status': node.status, 'aria-hidden': 'true' })
-    const body = element('span', { 'data-dsh-simplify-delegation-body': '' })
-    const title = element('span', { 'data-dsh-simplify-delegation-title': '' })
-    title.textContent = displayTitleOf(node, index)
-    const state = element('span', { 'data-dsh-simplify-delegation-state': '', 'data-status': node.status })
-    state.textContent = node.status === 'running'
+  const head = (text: string, cls: string): HTMLElement => {
+    const span = el('span', cls)
+    span.textContent = text
+    return span
+  }
+
+  const nodeView = (member: BatchMember, index: number): HTMLElement => {
+    const { node } = member
+    const row = el('div', `subagent-topology-node outcome-${node.status === 'running' ? 'running' : node.status === 'failed' ? 'failed' : node.status === 'denied' ? 'denied' : 'completed'}`)
+    row.setAttribute('role', 'listitem')
+    const actions = el('div', 'subagent-topology-node-actions')
+    const button = el('button', 'subagent-topology-node-header')
+    button.type = 'button'
+    button.title = [displayTitleOf(node, index), node.model ?? '', member.reason ?? ''].filter(Boolean).join(' · ')
+    button.addEventListener('click', () => options.openSession(node.id))
+
+    const avatar = el('span', 'subagent-topology-avatar')
+    avatar.setAttribute('aria-hidden', 'true')
+    avatar.append(icon(ICON_BOT, 15))
+    const statusIcon = el('span', 'subagent-topology-status-icon')
+    statusIcon.append(node.status === 'done'
+      ? icon(['M4 8.5l2.5 2.5L12 5'], 8)
+      : node.status === 'running' ? el('span') : icon(['M8 4.5v4', 'M8 11h.01'], 8))
+    avatar.append(statusIcon)
+
+    const copy = el('span', 'subagent-topology-node-copy')
+    const titleRow = el('span', 'subagent-topology-node-title-row')
+    titleRow.append(head(displayTitleOf(node, index), 'subagent-topology-node-title'))
+    if (node.model !== undefined) {
+      const model = el('span', 'subagent-topology-node-model')
+      model.title = node.model
+      model.append(head(node.model, 'subagent-topology-node-model-name'))
+      titleRow.append(model)
+    }
+    const stateText = node.status === 'running'
       ? options.locale('delegation.state.running')
       : node.status === 'failed'
         ? options.locale('delegation.state.failed')
         : node.status === 'denied' ? options.locale('delegation.state.denied') : options.locale('delegation.state.done')
-    const head = element('span', { 'data-dsh-simplify-delegation-headline': '' })
-    head.append(title, state)
-    const meta = element('span', { 'data-dsh-simplify-delegation-meta': '' })
-    meta.textContent = [
-      node.model ?? null,
-      node.durationMs === undefined ? null : formatDelegationDuration(node.durationMs, options.locale),
-      node.steps === undefined ? null : options.locale('delegation.stepsShort', { count: node.steps })
-    ].filter((part): part is string => part !== null && part !== '').join(' · ')
-    body.append(head, meta)
-    if (reason !== undefined && node.status !== 'running' && node.status !== 'done') {
-      const note = element('span', { 'data-dsh-simplify-delegation-reason': '' })
-      note.textContent = reason
-      note.title = reason
-      body.append(note)
+    const duration = node.durationMs === undefined ? '' : ` · ${formatDelegationDuration(node.durationMs, options.locale)}`
+    titleRow.append(head(`${stateText}${duration}`, 'subagent-topology-node-status'))
+    copy.append(titleRow)
+    if (member.reason !== undefined) copy.append(head(member.reason, 'subagent-topology-node-summary'))
+    if (node.steps !== undefined) copy.append(head(options.locale('delegation.steps', { count: node.steps }), 'subagent-topology-node-steps'))
+    button.append(avatar, copy)
+    if (node.status === 'running') {
+      const spinner = el('span', 'subagent-topology-spinner')
+      spinner.setAttribute('aria-hidden', 'true')
+      button.append(spinner)
     }
-    open.append(dot, body)
-    open.addEventListener('click', () => options.openSession(node.id))
-    wrapper.append(open)
-    // 只有客户端确实持有该子会话时才给停止按钮，避免点了没反应。
+    actions.append(button)
     if (node.status === 'running' && options.cancelSession !== undefined && options.canCancel?.(node.id) === true) {
-      const stop = element('button', { type: 'button', 'data-dsh-simplify-delegation-stop': '', title: options.locale('delegation.stop') })
+      const stop = el('button', 'subagent-stop-button')
+      stop.type = 'button'
       stop.textContent = options.locale('delegation.stopLabel')
+      stop.title = options.locale('delegation.stop')
       stop.addEventListener('click', (event) => {
         event.stopPropagation()
         options.cancelSession?.(node.id)
       })
-      wrapper.append(stop)
+      actions.append(stop)
     }
-    return wrapper
+    row.append(actions)
+    return row
+  }
+
+  const batchView = (members: BatchMember[]): HTMLElement => {
+    const section = el('section', 'subagent-topology')
+    section.setAttribute('aria-label', options.locale('delegation.agent'))
+    const root = el('div', 'subagent-topology-root')
+    const rootIcon = el('span', 'subagent-topology-root-icon')
+    rootIcon.setAttribute('aria-hidden', 'true')
+    rootIcon.append(icon(ICON_TARGET, 16))
+    const copy = el('span', 'subagent-topology-root-copy')
+    copy.append(head(options.locale('delegation.agent'), ''))
+    copy.firstElementChild!.setAttribute('data-dsh-simplify-root-title', '')
+    const detail = el('span')
+    detail.textContent = options.locale('delegation.coordinating', { count: members.length })
+    copy.append(detail)
+    root.append(rootIcon, copy)
+    const connector = el('span', 'subagent-topology-connector')
+    connector.setAttribute('aria-hidden', 'true')
+    const agents = el('div', 'subagent-topology-agents')
+    agents.setAttribute('role', 'list')
+    members.forEach((member, index) => agents.append(nodeView(member, index)))
+    section.append(root, connector, agents)
+    return section
   }
 
   const sync = () => {
@@ -156,61 +226,81 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     const rows = options.sessions.getSnapshot().byId
     const now = Date.now()
     const live = new Set<Element>()
-    const claimed = new Set<string>()
     let running = false
-    let index = 0
-    let fallbacks = 0
     let rowCount = 0
+    let fallbacks = 0
 
     for (const turn of document.querySelectorAll(TURN)) {
-      const toolRows = [...turn.querySelectorAll<HTMLElement>(TOOL_ROW)].filter((row) => isDelegationTool(row.getAttribute('data-tool')))
-      for (const row of toolRows) {
-        rowCount += 1
-        let ids = pickSubagentIds(row.textContent ?? '', rows, parentId)
-        if (ids.length === 0) {
-          // 文字里没有 id（折叠输出、错误结果、截断）：按快照顺序认领本会话尚未
-          // 被占用的子代理，避免整条委派没有卡片。
-          const orphan = Object.entries(rows).find(([id, candidate]) => candidate !== undefined && candidate.origin === 'subagent' && candidate.parentId === parentId && !claimed.has(id))?.[0]
-          if (orphan !== undefined) {
-            ids = [orphan]
-            fallbacks += 1
+      // 按聊天节点顺序切批：连续委派算一批，中间出现别的工具调用就断开。
+      const groups: Array<{ anchor: Element; rows: HTMLElement[] }> = []
+      let current: { anchor: Element; rows: HTMLElement[] } | null = null
+      const claimed = new Set<string>()
+      for (const node of turn.querySelectorAll<HTMLElement>(NODE_KEY)) {
+        const own = [...node.querySelectorAll<HTMLElement>(TOOL_ROW)].filter((row) => isDelegationTool(row.getAttribute('data-tool')))
+        const other = node.querySelectorAll(TOOL_ROW).length > own.length
+        if (own.length === 0) {
+          if (other && current !== null) {
+            groups.push(current)
+            current = null
           }
+          continue
         }
-        for (const id of ids) claimed.add(id)
-        const rawState = row.getAttribute('data-state')
-        const abnormal: Abnormal = rawState === 'error' ? 'failed' : rawState === 'denied' ? 'denied' : null
-        const nodes = delegationNodesFor(ids, abnormal, rows, now)
-        if (nodes.length === 0) continue
-        live.add(row)
-        if (nodes[0].status === 'running') running = true
-        // 插在这次委派自己的位置：紧跟在它所在的聊天节点之后。
-        const anchor = row.closest('[data-chat-node-key]') ?? row
+        current ??= { anchor: node, rows: [] }
+        current.rows.push(...own)
+        current.anchor = node
+      }
+      if (current !== null) groups.push(current)
+
+      for (const group of groups) {
+        const members: BatchMember[] = []
+        const groupRows: HTMLElement[] = []
+        for (const row of group.rows) {
+          rowCount += 1
+          let ids = pickSubagentIds(row.textContent ?? '', rows, parentId)
+          if (ids.length === 0) {
+            const orphan = Object.entries(rows).find(([id, candidate]) => candidate !== undefined && candidate.origin === 'subagent' && candidate.parentId === parentId && !claimed.has(id))?.[0]
+            if (orphan !== undefined) {
+              ids = [orphan]
+              fallbacks += 1
+            }
+          }
+          for (const id of ids) claimed.add(id)
+          const rawState = row.getAttribute('data-state')
+          const abnormal: Abnormal = rawState === 'error' ? 'failed' : rawState === 'denied' ? 'denied' : null
+          const nodes = delegationNodesFor(ids, abnormal, rows, now)
+          if (nodes.length === 0) continue
+          members.push({ node: nodes[0], ...(abnormal === null ? {} : { reason: errorReasonOf(row) }) })
+          groupRows.push(row)
+          if (nodes[0].status === 'running') running = true
+        }
+        if (members.length === 0) continue
+        for (const row of groupRows) {
+          row.setAttribute(SOURCE_ATTR, '')
+          live.add(row)
+        }
+        const anchor = group.anchor
         const parent = anchor.parentElement
         if (parent === null) continue
-        let host = hosts.get(row)
+        let host = hosts.get(anchor)
         if (host === undefined) {
-          host = element('div', { [`${HOST_ATTR}-host`]: '' })
-          hosts.set(row, host)
+          host = el('div', 'subagent-topology-host')
+          hosts.set(anchor, host)
         }
         if (host.parentElement !== parent || host.previousElementSibling !== anchor) {
           parent.insertBefore(host, anchor.nextSibling)
         }
-        row.setAttribute(SOURCE_ATTR, '')
-        const content = card(nodes[0], index++, abnormal === null ? undefined : errorReasonOf(row))
-        const signature = `${nodes[0].id}|${nodes[0].status}|${nodes[0].steps ?? -1}|${Math.round((nodes[0].durationMs ?? 0) / 1000)}|${nodes[0].model ?? ''}`
+        const signature = JSON.stringify(members.map(({ node, reason }) => [node.id, node.status, node.model ?? '', node.steps ?? -1, Math.round((node.durationMs ?? 0) / 1000), reason ?? '']))
         if (host.dataset.signature !== signature) {
           host.dataset.signature = signature
-          host.replaceChildren(content)
+          host.replaceChildren(batchView(members))
         }
       }
     }
 
-    // 宿主回收后解除隐藏。
     for (const row of document.querySelectorAll(`[${SOURCE_ATTR}]`)) {
       if (!live.has(row)) row.removeAttribute(SOURCE_ATTR)
     }
-
-    if (debug) console.info(`[dsh-simplify-theme] 委派卡片: 工具行 ${rowCount} 条, 兜底 ${fallbacks} 条, 会话 ${parentId ?? '未知'}`)
+    if (debug) console.info(`[dsh-simplify-theme] 委派图: 工具行 ${rowCount} 条, 兜底 ${fallbacks} 条, 会话 ${parentId ?? '未知'}`)
 
     if (running && ticker === undefined) ticker = window.setInterval(schedule, 1000)
     else if (!running && ticker !== undefined) {
@@ -218,7 +308,6 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
       ticker = undefined
     }
 
-    // 刚创建、还没被打开过的子代理可能只有标题：拉一次父会话投影补齐统计。
     const missing = [...live].some((row) => {
       const ids = pickSubagentIds(row.textContent ?? '', rows, parentId)
       const node = ids[0] === undefined ? undefined : toDelegationNode(ids[0], rows[ids[0]], now)
@@ -241,12 +330,6 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     })
   }
 
-  try {
-    debug = localStorage.getItem('dsh-simplify-theme.debug') === '1'
-  } catch {
-    debug = false
-  }
-
   const unsubscribe = options.sessions.subscribe(schedule)
   const observer = new MutationObserver(schedule)
   observer.observe(document.body, { childList: true, subtree: true })
@@ -258,7 +341,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
       observer.disconnect()
       if (ticker !== undefined) window.clearInterval(ticker)
       if (frame !== 0) window.cancelAnimationFrame(frame)
-      for (const host of document.querySelectorAll(`[${HOST_ATTR}-host]`)) host.remove()
+      for (const host of document.querySelectorAll('.subagent-topology-host')) host.remove()
       for (const row of document.querySelectorAll(`[${SOURCE_ATTR}]`)) row.removeAttribute(SOURCE_ATTR)
     }
   }
