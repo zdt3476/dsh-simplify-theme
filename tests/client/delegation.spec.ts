@@ -128,3 +128,21 @@ describe('failure reason', () => {
     expect(errorReasonOf(null)).toBeUndefined()
   })
 })
+
+describe('fallback claiming', () => {
+  it('孤儿行按顺序认领未被占用的子代理', () => {
+    const rows = {
+      a: { id: 'a', displayTitle: 'one', origin: 'subagent', parentId: 'p', running: false },
+      b: { id: 'b', displayTitle: 'two', origin: 'subagent', parentId: 'p', running: false },
+      other: { id: 'other', displayTitle: 'x', origin: 'subagent', parentId: 'q', running: false }
+    }
+    const claimed = new Set<string>()
+    const first = Object.entries(rows).find(([id, row]) => row !== undefined && row.origin === 'subagent' && row.parentId === 'p' && !claimed.has(id))?.[0]
+    expect(first).toBe('a')
+    claimed.add(first as string)
+    const second = Object.entries(rows).find(([id, row]) => row !== undefined && row.origin === 'subagent' && row.parentId === 'p' && !claimed.has(id))?.[0]
+    expect(second).toBe('b')
+    claimed.add(second as string)
+    expect(Object.entries(rows).find(([id, row]) => row !== undefined && row.origin === 'subagent' && row.parentId === 'p' && !claimed.has(id))).toBeUndefined()
+  })
+})

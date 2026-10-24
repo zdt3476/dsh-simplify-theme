@@ -102,6 +102,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
   // 工具行 → 卡片宿主，行消失时跟着回收。
   const hosts = new WeakMap<Element, HTMLElement>()
   const refreshed = new Set<string>()
+  let debug = false
   let ticker: number | undefined
   let frame = 0
 
@@ -155,13 +156,27 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     const rows = options.sessions.getSnapshot().byId
     const now = Date.now()
     const live = new Set<Element>()
+    const claimed = new Set<string>()
     let running = false
     let index = 0
+    let fallbacks = 0
+    let rowCount = 0
 
     for (const turn of document.querySelectorAll(TURN)) {
       const toolRows = [...turn.querySelectorAll<HTMLElement>(TOOL_ROW)].filter((row) => isDelegationTool(row.getAttribute('data-tool')))
       for (const row of toolRows) {
-        const ids = pickSubagentIds(row.textContent ?? '', rows, parentId)
+        rowCount += 1
+        let ids = pickSubagentIds(row.textContent ?? '', rows, parentId)
+        if (ids.length === 0) {
+          // 文字里没有 id（折叠输出、错误结果、截断）：按快照顺序认领本会话尚未
+          // 被占用的子代理，避免整条委派没有卡片。
+          const orphan = Object.entries(rows).find(([id, candidate]) => candidate !== undefined && candidate.origin === 'subagent' && candidate.parentId === parentId && !claimed.has(id))?.[0]
+          if (orphan !== undefined) {
+            ids = [orphan]
+            fallbacks += 1
+          }
+        }
+        for (const id of ids) claimed.add(id)
         const rawState = row.getAttribute('data-state')
         const abnormal: Abnormal = rawState === 'error' ? 'failed' : rawState === 'denied' ? 'denied' : null
         const nodes = delegationNodesFor(ids, abnormal, rows, now)
@@ -195,6 +210,8 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
       if (!live.has(row)) row.removeAttribute(SOURCE_ATTR)
     }
 
+    if (debug) console.info(`[dsh-simplify-theme] 委派卡片: 工具行 ${rowCount} 条, 兜底 ${fallbacks} 条, 会话 ${parentId ?? '未知'}`)
+
     if (running && ticker === undefined) ticker = window.setInterval(schedule, 1000)
     else if (!running && ticker !== undefined) {
       window.clearInterval(ticker)
@@ -222,6 +239,12 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
         console.error('[dsh-simplify-theme] delegation panel failed:', error)
       }
     })
+  }
+
+  try {
+    debug = localStorage.getItem('dsh-simplify-theme.debug') === '1'
+  } catch {
+    debug = false
   }
 
   const unsubscribe = options.sessions.subscribe(schedule)
