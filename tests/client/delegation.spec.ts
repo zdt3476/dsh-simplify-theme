@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { delegationDuration, selectionModel, toDelegationNode } from '../../src/client/delegation-tree'
-import { formatDelegationDuration, isDelegationTool, pickSubagentIds, turnDelegations } from '../../src/client/delegation-panel'
+import { delegationNodesFor, formatDelegationDuration, isDelegationTool, pickSubagentIds } from '../../src/client/delegation-panel'
 
 const rows = {
   child1: {
@@ -77,7 +77,7 @@ describe('delegation duration formatting', () => {
   })
 })
 
-describe('per-turn delegation matching', () => {
+describe('per-delegation matching', () => {
   const childA = { id: 'a', displayTitle: 'explorer', origin: 'subagent', parentId: 'p', running: false, projectionValues: { subagentTiming: { settledMs: 10_000 } } }
   const childB = { id: 'b', displayTitle: 'explorer', origin: 'subagent', parentId: 'p', running: true, projectionValues: { subagentTiming: { settledMs: 0 } } }
   const store = { a: childA, b: childB }
@@ -96,35 +96,13 @@ describe('per-turn delegation matching', () => {
     expect(pickSubagentIds('没有 id', store, 'p')).toEqual([])
   })
 
-  it('按回合归纳节点，失败行标记为失败', () => {
-    const turn = turnDelegations([['a'], ['b']], [true, false], store, 'p', 0)
-    expect(turn.nodes.map(node => [node.id, node.status])).toEqual([['a', 'failed'], ['b', 'running']])
-    expect(turn.failed).toBe(1)
-  })
-
-  it('工具行没有 id 时补上未认领的子代理', () => {
-    const turn = turnDelegations([[], []], [false, false], store, 'p', 0)
-    expect(turn.nodes.map(node => node.id).sort()).toEqual(['a', 'b'])
-    expect(turn.failed).toBe(0)
-  })
-})
-
-describe('cross-turn claiming', () => {
-  const madeish = (id: string) => ({ id, origin: 'subagent', parentId: 'p', running: false, projectionValues: { sessionStats: { steps: 1 }, subagentTiming: { settledMs: 1000 } } })
-  const store = { a: madeish('a'), b: madeish('b') }
-
-  it('同一子代理只归到最先认领它的回合', () => {
-    const claimed = new Set<string>()
-    const first = turnDelegations([['a'], ['b']], [false, false], store, 'p', 0, claimed)
-    expect(first.nodes.map(node => node.id)).toEqual(['a', 'b'])
-    const again = turnDelegations([['a'], ['b']], [false, false], store, 'p', 0, claimed)
-    expect(again.nodes).toEqual([])
-  })
-
-  it('有 id 的回合不再触发兜底补齐', () => {
-    const claimed = new Set<string>()
-    const turn = turnDelegations([['a'], []], [false, false], store, 'p', 0, claimed)
-    expect(turn.nodes.map(node => node.id)).toEqual(['a'])
+  it('一条工具行只产出一张卡，异常态覆盖运行态', () => {
+    expect(delegationNodesFor(['a'], null, store, 0).map(node => node.status)).toEqual(['done'])
+    expect(delegationNodesFor(['b'], null, store, 0).map(node => node.status)).toEqual(['running'])
+    expect(delegationNodesFor(['a'], 'failed', store, 0).map(node => node.status)).toEqual(['failed'])
+    expect(delegationNodesFor(['a'], 'denied', store, 0).map(node => node.status)).toEqual(['denied'])
+    expect(delegationNodesFor([], null, store, 0)).toEqual([])
+    expect(delegationNodesFor(['missing'], null, store, 0)).toEqual([])
   })
 })
 

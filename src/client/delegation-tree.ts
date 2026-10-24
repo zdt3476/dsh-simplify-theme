@@ -6,7 +6,7 @@
  * 这里只做「取哪几行、怎么归纳」，不碰 DOM，便于单测。
  */
 
-export type DelegationStatus = 'running' | 'done' | 'failed'
+export type DelegationStatus = 'running' | 'done' | 'failed' | 'denied'
 
 export interface DelegationNode {
   id: string

@@ -22,6 +22,7 @@ import { mountStatColors } from './stat-colors-mount'
 import { mountTurnDuration } from './turn-duration'
 import { mountDelegationPanel } from './delegation-panel'
 import { mountDockAlign } from './dock-align'
+import { mountSubagentOverview } from './subagent-overview'
 import { collectUsage } from './usage-rank'
 import { readLocalUsage, recordLocalUsage } from './usage-store'
 import { CURRENT_SESSION_KEY, readCurrentSessionId } from './hero-dock'
@@ -123,9 +124,14 @@ const DICT_ZH: Record<string, string> = {
   'delegation.state.running': '运行中',
   'delegation.state.done': '已完成',
   'delegation.state.failed': '失败',
+  'delegation.state.denied': '已拒绝',
+  'overview.title': '子代理',
+  'overview.running': '{running} 运行中 · {done}/{total}',
+  'overview.done': '全部完成 {done}/{total}',
   'delegation.failed': '{count} 个失败',
   'delegation.open': '打开子会话',
   'delegation.steps': '{count} 个步骤',
+  'delegation.stepsShort': '{count} 步',
   'duration.ms': '毫秒',
   'duration.s': '秒',
   'duration.m': '分',
@@ -175,9 +181,14 @@ const DICT_EN: Record<string, string> = {
   'delegation.state.running': 'Running',
   'delegation.state.done': 'Completed',
   'delegation.state.failed': 'Failed',
+  'delegation.state.denied': 'Denied',
+  'overview.title': 'Subagents',
+  'overview.running': '{running} running · {done}/{total}',
+  'overview.done': 'All done {done}/{total}',
   'delegation.failed': '{count} failed',
   'delegation.open': 'Open subagent session',
   'delegation.steps': '{count} steps',
+  'delegation.stepsShort': '{count} steps',
   'duration.ms': 'ms',
   'duration.s': 's',
   'duration.m': 'm',
@@ -344,6 +355,16 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
     const sessions = ctx.sessions?.list
     if (sessions === undefined) return
     const t = withFallback(ctx.locale.bind(PLUGIN_ID), DICT_ZH)
+    const openSession = (sessionId: string) => {
+      const service = (ctx as { get?: (name: string) => unknown }).get?.('uiWorkspace') as { openSession?: (id: string) => void } | undefined
+      service?.openSession?.(sessionId)
+    }
+    const overview = mountSubagentOverview({
+      sessions: sessions as never,
+      currentSessionId: () => readCurrentSessionId(localStorage.getItem(CURRENT_SESSION_KEY)),
+      locale: t,
+      openSession
+    })
     const panel = mountDelegationPanel({
       sessions: {
         getSnapshot: () => sessions.getSnapshot() as never,
@@ -352,10 +373,7 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
       },
       currentSessionId: () => readCurrentSessionId(localStorage.getItem(CURRENT_SESSION_KEY)),
       locale: t,
-      openSession: (sessionId: string) => {
-        const service = (ctx as { get?: (name: string) => unknown }).get?.('uiWorkspace') as { openSession?: (id: string) => void } | undefined
-        service?.openSession?.(sessionId)
-      }
+      openSession
     })
     const mount = mountTurnDuration({
       sessions,
@@ -365,6 +383,7 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
     return () => {
       mount?.unmount()
       panel?.dispose()
+      overview?.dispose()
     }
   }, 'simplify-theme: turn duration')
 }

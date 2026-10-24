@@ -507,143 +507,42 @@ export const UI_CSS = `
   font-weight: 600;
 }
 
-/* —— 子代理编排卡片 —— */
-[data-dsh-simplify-delegations-host] { display: block; margin-top: 8px; }
+/* —— 子代理委派卡片（一次委派一张，固定宽度居中） —— */
+[data-dsh-simplify-delegation-source] { display: none !important; }
 
-[data-dsh-simplify-delegations] {
-  margin: 0 0 12px;
+[data-dsh-simplify-delegations-host] {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+[data-dsh-simplify-delegations-card] {
+  --dsh-simplify-status: var(--dsw-alias-state-success-primary);
+  box-sizing: border-box;
+  width: min(420px, 100%);
+  padding-left: 3px;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: var(--dsw-radius-lg);
+  border-left: 3px solid var(--dsh-simplify-status);
+  border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-2);
   overflow: hidden;
+  transition: border-color 0.12s ease, background 0.12s ease;
 }
 
-[data-dsh-simplify-delegation-head] {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
+[data-dsh-simplify-delegations-card][data-status='running'] { --dsh-simplify-status: var(--dsw-alias-state-business-primary); }
+[data-dsh-simplify-delegations-card][data-status='failed'],
+[data-dsh-simplify-delegations-card][data-status='denied'] { --dsh-simplify-status: var(--dsw-alias-state-error-primary); }
 
-[data-dsh-simplify-delegation-head]:hover { background: var(--dsw-alias-interactive-bg-hover); }
-
-[data-dsh-simplify-delegation-chevron] {
-  flex: none;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 5px solid var(--dsw-alias-label-caption);
-  transition: transform 0.12s ease;
-}
-
-[data-dsh-simplify-delegations][data-collapsed='true'] [data-dsh-simplify-delegation-chevron] { transform: rotate(-90deg); }
-
-[data-dsh-simplify-delegation-heading] { font-weight: 600; color: var(--dsw-alias-label-primary); }
-[data-dsh-simplify-delegation-summary] { color: var(--dsw-alias-label-tertiary); }
-[data-dsh-simplify-delegation-total] {
-  margin-left: auto;
-  color: var(--dsw-alias-label-tertiary);
-  font-variant-numeric: tabular-nums;
-}
-
-/* 单层图：左侧主 Agent，右侧子代理列表，中间一条连接线 */
-[data-dsh-simplify-delegation-graph] {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 4px 12px 12px;
-}
-
-[data-dsh-simplify-delegation-root] {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 180px;
-  padding: 8px 10px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-[data-dsh-simplify-delegation-root-icon] {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--dsw-alias-state-business-primary);
-}
-
-[data-dsh-simplify-delegation-root-copy] {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-  font-size: 12px;
-}
-
-[data-dsh-simplify-delegation-root-copy] > strong { color: var(--dsw-alias-label-primary); font-weight: 600; }
-[data-dsh-simplify-delegation-root-copy] > span { color: var(--dsw-alias-label-tertiary); font-size: 11px; }
-
-[data-dsh-simplify-delegation-connector] {
-  flex: none;
-  width: 12px;
-  height: 1px;
-  background: var(--dsw-alias-border-l2);
-}
-
-[data-dsh-simplify-delegation-agents] {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-/* 主干：从第一个子代理连到最后一个，避免只剩几条断开的横线 */
-[data-dsh-simplify-delegation-agents]::before {
-  content: '';
-  position: absolute;
-  left: -12px;
-  top: 18px;
-  bottom: 18px;
-  width: 1px;
-  background: var(--dsw-alias-border-l2);
-}
-
-[data-dsh-simplify-delegation-node] {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: var(--dsw-radius-md);
-}
-
-[data-dsh-simplify-delegation-node]:hover { border-color: var(--dsw-alias-border-l2); }
+[data-dsh-simplify-delegations-card]:hover { background: var(--dsw-alias-interactive-bg-hover); }
 
 [data-dsh-simplify-delegation-open] {
   appearance: none;
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: none;
-  border-radius: inherit;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -654,18 +553,7 @@ export const UI_CSS = `
 [data-dsh-simplify-delegation-open]:hover { background: var(--dsw-alias-interactive-bg-hover); }
 [data-dsh-simplify-delegation-open]:focus-visible {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
-  outline-offset: -1px;
-}
-
-/* 每个子代理左侧的短横线，接出主 Agent 的连接线 */
-[data-dsh-simplify-delegation-node]::before {
-  content: '';
-  position: absolute;
-  left: -12px;
-  top: 18px;
-  width: 12px;
-  height: 1px;
-  background: var(--dsw-alias-border-l2);
+  outline-offset: -2px;
 }
 
 [data-dsh-simplify-delegation-icon] {
@@ -678,32 +566,176 @@ export const UI_CSS = `
 }
 
 [data-dsh-simplify-delegation-icon][data-status='running'] { background: var(--dsw-alias-state-business-primary); }
+[data-dsh-simplify-delegation-icon][data-status='failed'],
+[data-dsh-simplify-delegation-icon][data-status='denied'] { background: var(--dsw-alias-state-error-primary); }
 
-[data-dsh-simplify-delegation-body] { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-[data-dsh-simplify-delegation-title] { color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; }
+[data-dsh-simplify-delegation-body] {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+[data-dsh-simplify-delegation-headline] {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+[data-dsh-simplify-delegation-title] {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+[data-dsh-simplify-delegation-state] {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-size: 11px;
+  line-height: 17px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+[data-dsh-simplify-delegation-state][data-status='running'] { color: var(--dsw-alias-state-business-primary); }
+[data-dsh-simplify-delegation-state][data-status='done'] { color: var(--dsw-alias-state-success-primary); }
+[data-dsh-simplify-delegation-state][data-status='failed'],
+[data-dsh-simplify-delegation-state][data-status='denied'] { color: var(--dsw-alias-state-error-primary); }
 
 [data-dsh-simplify-delegation-meta] {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
-[data-dsh-simplify-delegation-model] {
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-secondary);
+/* —— 子代理总览：与 TODO 同排，各占一半 —— */
+[data-slot='conversation.input.dock'] {
+  display: flex !important;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
 }
 
-[data-dsh-simplify-delegation-state][data-status='running'] { color: var(--dsw-alias-state-business-primary); }
-[data-dsh-simplify-delegation-state][data-status='done'] { color: var(--dsw-alias-state-success-primary); }
-[data-dsh-simplify-delegation-state][data-status='failed'] { color: var(--dsw-alias-state-error-primary); }
-[data-dsh-simplify-delegation-icon][data-status='failed'] { background: var(--dsw-alias-state-error-primary); }
-[data-dsh-simplify-delegation-summary][data-failed='true'] { color: var(--dsw-alias-state-error-primary); }
+[data-slot='conversation.input.dock'] > * {
+  min-width: 0;
+}
+
+[data-slot='conversation.input.dock'] > [data-testid='todo-panel'],
+[data-slot='conversation.input.dock'] > [data-dsh-simplify-overview-host] {
+  flex: 1 1 0;
+}
+
+[data-dsh-simplify-overview-host] { display: block; }
+
+[data-dsh-simplify-subagent-overview] {
+  box-sizing: border-box;
+  height: 100%;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-2);
+  overflow: hidden;
+}
+
+[data-dsh-simplify-overview-head] {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-dsh-simplify-overview-head]:hover { background: var(--dsw-alias-interactive-bg-hover); }
+
+[data-dsh-simplify-overview-chevron] {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--dsw-alias-label-caption);
+  transition: transform 0.12s ease;
+}
+
+[data-dsh-simplify-subagent-overview][data-collapsed='true'] [data-dsh-simplify-overview-chevron] {
+  transform: rotate(-90deg);
+}
+
+[data-dsh-simplify-overview-title] { font-weight: 600; color: var(--dsw-alias-label-primary); }
+[data-dsh-simplify-overview-summary] { margin-left: auto; color: var(--dsw-alias-label-tertiary); font-variant-numeric: tabular-nums; }
+
+[data-dsh-simplify-overview-list] {
+  margin: 0;
+  padding: 0 4px 4px;
+  list-style: none;
+  max-height: 180px;
+  overflow: auto;
+}
+
+[data-dsh-simplify-overview-open] {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 6px;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-dsh-simplify-overview-open]:hover { background: var(--dsw-alias-interactive-bg-hover); }
+
+[data-dsh-simplify-overview-dot] {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-success-primary);
+}
+
+[data-dsh-simplify-overview-dot][data-status='running'] { background: var(--dsw-alias-state-business-primary); }
+[data-dsh-simplify-overview-dot][data-status='failed'],
+[data-dsh-simplify-overview-dot][data-status='denied'] { background: var(--dsw-alias-state-error-primary); }
+
+[data-dsh-simplify-overview-label] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-primary);
+}
+
+[data-dsh-simplify-overview-meta] {
+  margin-left: auto;
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
 
 /* —— 回合耗时 —— */
 [data-dsh-simplify-duration] {

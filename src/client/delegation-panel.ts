@@ -1,20 +1,22 @@
 /**
- * 子代理编排卡片的 DOM 装配（按回合）。
+ * 回合内的子代理卡片（一次委派一张）。
  *
- * 参考 PI-Desktop 的 SubagentTopology：单层图，只画真实存在的主 → 子关系。
- * DSH 里子代理是独立会话，委派发生在 `subagent` 工具调用上，因此定位方式是
- * 「回合容器 → 回合内的 subagent 工具行 → 行文本里的子会话 id」，再回会话快照
- * 取标题、模型、步骤、耗时、运行状态；失败态读工具行的 `data-state`。
+ * 参考 PI-Desktop 的单层图思路，但按实际操作粒度落位：每一条 `subagent` 工具
+ * 调用就是一次委派，就在它出现的位置插一张卡，不把同一回合的多次委派合并成一张。
  *
- * 卡片插在该回合末尾，因此一次会话里多轮委派各有一张，位置与真实发生处一致。
+ * 数据：会话列表快照里的子会话行（标题、模型、步骤、耗时、运行状态），失败/拒绝
+ * 读工具行的 `data-state`。卡片固定宽度、水平居中，避免在宽窗口下拉成一条长横条。
  */
 
-import { toDelegationNode, delegationDuration, type DelegationNode, type SessionRows } from './delegation-tree'
+import { toDelegationNode, type DelegationNode, type SessionRows } from './delegation-tree'
 
 const TURN = '[data-chat-turn]'
 const TOOL_ROW = '[data-tool]'
 const HOST_ATTR = 'data-dsh-simplify-delegations'
+/** 被卡片取代的原生工具行。 */
+const SOURCE_ATTR = 'data-dsh-simplify-delegation-source'
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
+const UUID_ONLY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** 委派类工具的 `data-tool` 名称；dsh-tool-subagent 默认叫 subagent。 */
 export function isDelegationTool(name: string | null): boolean {
@@ -33,56 +35,12 @@ export function pickSubagentIds(text: string, rows: SessionRows, parentId: strin
   return ids
 }
 
-export interface TurnDelegation {
-  nodes: DelegationNode[]
-  /** 该回合内委派失败的数量，用于卡片头提示。 */
-  failed: number
+/** 标题拿到的是裸 id 时改用序号，避免卡片上出现 UUID。 */
+export function displayTitleOf(node: DelegationNode, index: number): string {
+  return UUID_ONLY.test(node.title) ? `子代理 ${index + 1}` : node.title
 }
 
-/**
- * 把一回合内的工具行归纳成该回合的委派节点。
- *
- * 只在整回合都没有可用 id 时才兜底：按快照顺序补上「此前回合还没认领」的子代理，
- * 避免同一批子代理被每一轮重复画出来。
- * @param claimedAcrossTurns 本次扫描中已分配给更早回合的子代理 id，会被就地更新。
- */
-export function turnDelegations(
-  rowIds: readonly string[][],
-  failedRows: readonly boolean[],
-  rows: SessionRows,
-  parentId: string | undefined,
-  now = Date.now(),
-  claimedAcrossTurns: Set<string> = new Set()
-): TurnDelegation {
-  const nodes: DelegationNode[] = []
-  let failed = 0
-  let matchedAny = false
-  rowIds.forEach((ids, index) => {
-    for (const id of ids) {
-      if (claimedAcrossTurns.has(id)) continue
-      const node = toDelegationNode(id, rows[id], now)
-      if (node === null) continue
-      claimedAcrossTurns.add(id)
-      matchedAny = true
-      const isFailed = failedRows[index] === true
-      if (isFailed) failed += 1
-      nodes.push(isFailed ? { ...node, status: 'failed' } : node)
-    }
-  })
-  if (matchedAny) return { nodes, failed }
-  // 兜底：工具行没暴露 id 时，按快照顺序把没画过的子代理补进来。
-  for (const [id, row] of Object.entries(rows)) {
-    if (row === undefined || row.origin !== 'subagent' || row.parentId !== parentId) continue
-    if (claimedAcrossTurns.has(id)) continue
-    const node = toDelegationNode(id, rows[id], now)
-    if (node === null) continue
-    claimedAcrossTurns.add(id)
-    nodes.push(node)
-  }
-  return { nodes, failed }
-}
-
-/** 秒/分/小时的可读耗时。 */
+/** 秒/分可读耗时。 */
 export function formatDelegationDuration(ms: number, locale: (key: string) => string): string {
   const seconds = Math.round(ms / 100) / 10
   if (seconds < 60) return `${seconds}${locale('duration.s')}`
@@ -91,16 +49,29 @@ export function formatDelegationDuration(ms: number, locale: (key: string) => st
   return rest === 0 ? `${minutes}${locale('duration.m')}` : `${minutes}${locale('duration.m')} ${rest}${locale('duration.s')}`
 }
 
+export type Abnormal = 'failed' | 'denied' | null
+
+/**
+ * 一条工具行 → 一张卡要展示的节点。
+ * 行的 `data-state` 决定异常态；一次调用只派一个子代理，取第一个可用 id。
+ */
+export function delegationNodesFor(ids: readonly string[], abnormal: Abnormal, rows: SessionRows, now = Date.now()): DelegationNode[] {
+  for (const id of ids) {
+    const node = toDelegationNode(id, rows[id], now)
+    if (node === null) continue
+    return [abnormal === null ? node : { ...node, status: abnormal }]
+  }
+  return []
+}
+
 export interface DelegationPanelOptions {
   sessions: {
     getSnapshot: () => { byId: SessionRows }
     subscribe: (listener: () => void) => () => void
-    /** 主动拉一次父会话投影；catalog-only 的子会话靠它补齐步骤与耗时。 */
     refreshProjections?: (sessionId: string) => Promise<unknown> | void
   }
   currentSessionId: () => string | undefined
   locale: (key: string, params?: Record<string, string | number>) => string
-  /** 点卡片跳到对应子会话。 */
   openSession: (sessionId: string) => void
 }
 
@@ -117,165 +88,107 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<st
 export function mountDelegationPanel(options: DelegationPanelOptions): DelegationPanelHandle | null {
   if (typeof document === 'undefined') return null
 
-  const renderCard = (turn: Element, delegation: TurnDelegation): void => {
-    const { nodes, failed } = delegation
-    let host = turn.querySelector<HTMLElement>(`:scope > [${HOST_ATTR}-host]`)
-    if (nodes.length === 0) {
-      host?.remove()
-      return
-    }
-    if (host === null) {
-      host = element('div', { [`${HOST_ATTR}-host`]: '' })
-      turn.appendChild(host)
-    }
-    // 卡片内容变了才重绘；否则观察器会被自己的写入再次触发。
-    const signature = JSON.stringify({
-      collapsed: host.dataset.collapsed ?? 'false',
-      failed,
-      nodes: nodes.map((node) => [node.id, node.title, node.model ?? '', node.status, node.steps ?? -1, Math.round((node.durationMs ?? 0) / 1000)])
-    })
-    if (host.dataset.signature === signature) return
-    host.dataset.signature = signature
-
-    const running = nodes.filter((node) => node.status === 'running').length
-    const durationMs = nodes.reduce((total, node) => total + (node.durationMs ?? 0), 0)
-    const card = element('section', { [HOST_ATTR]: '', 'data-collapsed': host.dataset.collapsed ?? 'false' })
-    const head = element('button', {
-      type: 'button',
-      'data-dsh-simplify-delegation-head': '',
-      'aria-expanded': host.dataset.collapsed === 'true' ? 'false' : 'true'
-    })
-    head.append(element('span', { 'data-dsh-simplify-delegation-chevron': '', 'aria-hidden': 'true' }))
-    const heading = element('span', { 'data-dsh-simplify-delegation-heading': '' })
-    heading.textContent = options.locale('delegation.title')
-    head.append(heading)
-    const summary = failed > 0
-      ? options.locale('delegation.failed', { count: failed })
-      : running > 0
-        ? options.locale('delegation.running', { count: running })
-        : options.locale('delegation.finished')
-    const summaryNode = element('span', { 'data-dsh-simplify-delegation-summary': '', 'data-failed': failed > 0 ? 'true' : 'false' })
-    summaryNode.textContent = `${summary} · ${nodes.length - running}/${nodes.length}`
-    head.append(summaryNode)
-    if (durationMs > 0) {
-      const total = element('span', { 'data-dsh-simplify-delegation-total': '' })
-      total.textContent = formatDelegationDuration(durationMs, options.locale)
-      head.append(total)
-    }
-    head.addEventListener('click', () => {
-      const collapsed = host!.dataset.collapsed === 'true'
-      host!.dataset.collapsed = collapsed ? 'false' : 'true'
-      card.dataset.collapsed = host!.dataset.collapsed
-    })
-    card.append(head)
-
-    if (host.dataset.collapsed !== 'true') {
-      const graph = element('div', { 'data-dsh-simplify-delegation-graph': '' })
-      const root = element('div', { 'data-dsh-simplify-delegation-root': '' })
-      root.append(element('span', { 'data-dsh-simplify-delegation-root-icon': '', 'aria-hidden': 'true' }))
-      const copy = element('span', { 'data-dsh-simplify-delegation-root-copy': '' })
-      const strong = element('strong', {})
-      strong.textContent = options.locale('delegation.agent')
-      const detail = element('span', {})
-      detail.textContent = options.locale('delegation.coordinating', { count: nodes.length })
-      copy.append(strong, detail)
-      root.append(copy)
-      graph.append(root, element('span', { 'data-dsh-simplify-delegation-connector': '', 'aria-hidden': 'true' }))
-
-      const list = element('ul', { 'data-dsh-simplify-delegation-agents': '', role: 'list' })
-      for (const node of nodes) {
-        const item = element('li', { 'data-dsh-simplify-delegation-node': '', 'data-status': node.status })
-        const open = element('button', { type: 'button', 'data-dsh-simplify-delegation-open': '', title: options.locale('delegation.open') })
-        open.append(element('span', { 'data-dsh-simplify-delegation-icon': '', 'data-status': node.status, 'aria-hidden': 'true' }))
-        const body = element('span', { 'data-dsh-simplify-delegation-body': '' })
-        const title = element('span', { 'data-dsh-simplify-delegation-title': '' })
-        title.textContent = node.title
-        const meta = element('span', { 'data-dsh-simplify-delegation-meta': '' })
-        if (node.model !== undefined) {
-          const model = element('span', { 'data-dsh-simplify-delegation-model': '' })
-          model.textContent = node.model
-          meta.append(model)
-        }
-        const state = element('span', { 'data-dsh-simplify-delegation-state': '', 'data-status': node.status })
-        state.textContent = node.status === 'running'
-          ? options.locale('delegation.state.running')
-          : node.status === 'failed' ? options.locale('delegation.state.failed') : options.locale('delegation.state.done')
-        meta.append(state)
-        if (node.durationMs !== undefined) {
-          const duration = element('span', {})
-          duration.textContent = formatDelegationDuration(node.durationMs, options.locale)
-          meta.append(duration)
-        }
-        if (node.steps !== undefined) {
-          const steps = element('span', {})
-          steps.textContent = options.locale('delegation.steps', { count: node.steps })
-          meta.append(steps)
-        }
-        body.append(title, meta)
-        open.append(body)
-        open.addEventListener('click', () => options.openSession(node.id))
-        item.append(open)
-        list.append(item)
-      }
-      graph.append(list)
-      card.append(graph)
-    }
-    host.replaceChildren(card)
-  }
-
-  // 子代理运行中耗时需要每秒走一格；没有运行中的节点时停表。
-  let ticker: number | undefined
-  const armTicker = (running: boolean) => {
-    if (running && ticker === undefined) {
-      ticker = window.setInterval(schedule, 1000)
-    } else if (!running && ticker !== undefined) {
-      window.clearInterval(ticker)
-      ticker = undefined
-    }
-  }
-
-  // 每个父会话只主动拉一次投影，失败后允许重试。
+  // 工具行 → 卡片宿主，行消失时跟着回收。
+  const hosts = new WeakMap<Element, HTMLElement>()
   const refreshed = new Set<string>()
+  let ticker: number | undefined
+  let frame = 0
+
+  const card = (node: DelegationNode, index: number): HTMLElement => {
+    const wrapper = element('div', { [`${HOST_ATTR}-card`]: '', 'data-status': node.status })
+    const open = element('button', { type: 'button', 'data-dsh-simplify-delegation-open': '', title: options.locale('delegation.open') })
+    const dot = element('span', { 'data-dsh-simplify-delegation-icon': '', 'data-status': node.status, 'aria-hidden': 'true' })
+    const body = element('span', { 'data-dsh-simplify-delegation-body': '' })
+    const title = element('span', { 'data-dsh-simplify-delegation-title': '' })
+    title.textContent = displayTitleOf(node, index)
+    const state = element('span', { 'data-dsh-simplify-delegation-state': '', 'data-status': node.status })
+    state.textContent = node.status === 'running'
+      ? options.locale('delegation.state.running')
+      : node.status === 'failed'
+        ? options.locale('delegation.state.failed')
+        : node.status === 'denied' ? options.locale('delegation.state.denied') : options.locale('delegation.state.done')
+    const head = element('span', { 'data-dsh-simplify-delegation-headline': '' })
+    head.append(title, state)
+    const meta = element('span', { 'data-dsh-simplify-delegation-meta': '' })
+    meta.textContent = [
+      node.model ?? null,
+      node.durationMs === undefined ? null : formatDelegationDuration(node.durationMs, options.locale),
+      node.steps === undefined ? null : options.locale('delegation.stepsShort', { count: node.steps })
+    ].filter((part): part is string => part !== null && part !== '').join(' · ')
+    body.append(head, meta)
+    open.append(dot, body)
+    open.addEventListener('click', () => options.openSession(node.id))
+    wrapper.append(open)
+    return wrapper
+  }
 
   const sync = () => {
+    frame = 0
     const parentId = options.currentSessionId()
     const rows = options.sessions.getSnapshot().byId
     const now = Date.now()
-    const turns = [...document.querySelectorAll(TURN)]
-    // 跨回合共享「已认领」集合：同一个子代理只出现在它所属的回合里。
-    const claimed = new Set<string>()
-    let anyRunning = false
-    let missingProjection = false
-    for (const turn of turns) {
+    const live = new Set<Element>()
+    let running = false
+    let index = 0
+
+    for (const turn of document.querySelectorAll(TURN)) {
       const toolRows = [...turn.querySelectorAll<HTMLElement>(TOOL_ROW)].filter((row) => isDelegationTool(row.getAttribute('data-tool')))
-      if (toolRows.length === 0) {
-        turn.querySelector(`:scope > [${HOST_ATTR}-host]`)?.remove()
-        continue
+      for (const row of toolRows) {
+        const ids = pickSubagentIds(row.textContent ?? '', rows, parentId)
+        const rawState = row.getAttribute('data-state')
+        const abnormal: Abnormal = rawState === 'error' ? 'failed' : rawState === 'denied' ? 'denied' : null
+        const nodes = delegationNodesFor(ids, abnormal, rows, now)
+        if (nodes.length === 0) continue
+        live.add(row)
+        if (nodes[0].status === 'running') running = true
+        // 插在这次委派自己的位置：紧跟在它所在的聊天节点之后。
+        const anchor = row.closest('[data-chat-node-key]') ?? row
+        const parent = anchor.parentElement
+        if (parent === null) continue
+        let host = hosts.get(row)
+        if (host === undefined) {
+          host = element('div', { [`${HOST_ATTR}-host`]: '' })
+          hosts.set(row, host)
+        }
+        if (host.parentElement !== parent || host.previousElementSibling !== anchor) {
+          parent.insertBefore(host, anchor.nextSibling)
+        }
+        row.setAttribute(SOURCE_ATTR, '')
+        const content = card(nodes[0], index++)
+        const signature = `${nodes[0].id}|${nodes[0].status}|${nodes[0].steps ?? -1}|${Math.round((nodes[0].durationMs ?? 0) / 1000)}|${nodes[0].model ?? ''}`
+        if (host.dataset.signature !== signature) {
+          host.dataset.signature = signature
+          host.replaceChildren(content)
+        }
       }
-      const ids = toolRows.map((row) => pickSubagentIds(row.textContent ?? '', rows, parentId))
-      const failed = toolRows.map((row) => row.getAttribute('data-state') === 'error' || row.getAttribute('data-state') === 'denied')
-      const delegation = turnDelegations(ids, failed, rows, parentId, now, claimed)
-      if (delegation.nodes.some((node) => node.status === 'running')) anyRunning = true
-      if (delegation.nodes.some((node) => node.steps === undefined && node.durationMs === undefined)) missingProjection = true
-      renderCard(turn, delegation)
     }
-    armTicker(anyRunning)
-    // 刚创建、还没被打开过的子会话可能只有 label：拉一次父会话投影把统计补齐。
-    if (missingProjection && parentId !== undefined && !refreshed.has(parentId) && options.sessions.refreshProjections !== undefined) {
+
+    // 宿主回收后解除隐藏。
+    for (const row of document.querySelectorAll(`[${SOURCE_ATTR}]`)) {
+      if (!live.has(row)) row.removeAttribute(SOURCE_ATTR)
+    }
+
+    if (running && ticker === undefined) ticker = window.setInterval(schedule, 1000)
+    else if (!running && ticker !== undefined) {
+      window.clearInterval(ticker)
+      ticker = undefined
+    }
+
+    // 刚创建、还没被打开过的子代理可能只有标题：拉一次父会话投影补齐统计。
+    const missing = [...live].some((row) => {
+      const ids = pickSubagentIds(row.textContent ?? '', rows, parentId)
+      const node = ids[0] === undefined ? undefined : toDelegationNode(ids[0], rows[ids[0]], now)
+      return node !== undefined && node !== null && node.steps === undefined && node.durationMs === undefined
+    })
+    if (missing && parentId !== undefined && !refreshed.has(parentId) && options.sessions.refreshProjections !== undefined) {
       refreshed.add(parentId)
-      void Promise.resolve(options.sessions.refreshProjections(parentId)).catch(() => {
-        refreshed.delete(parentId)
-      })
+      void Promise.resolve(options.sessions.refreshProjections(parentId)).catch(() => refreshed.delete(parentId))
     }
   }
 
-
-
-  let frame = 0
   const schedule = () => {
     if (frame !== 0) return
     frame = window.requestAnimationFrame(() => {
-      frame = 0
       try {
         sync()
       } catch (error) {
@@ -296,6 +209,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
       if (ticker !== undefined) window.clearInterval(ticker)
       if (frame !== 0) window.cancelAnimationFrame(frame)
       for (const host of document.querySelectorAll(`[${HOST_ATTR}-host]`)) host.remove()
+      for (const row of document.querySelectorAll(`[${SOURCE_ATTR}]`)) row.removeAttribute(SOURCE_ATTR)
     }
   }
 }
