@@ -10,6 +10,7 @@ const CARD = '[data-composer-card]'
 const DOCK_ROW = '[data-composer-dock]'
 const HOST = '[data-dsh-simplify-dock]'
 const VAR = '--dsh-simplify-card-width'
+const INSET = '--dsh-simplify-dock-inset-x'
 
 export interface DockAlignHandle {
   dispose: () => void
@@ -31,6 +32,7 @@ export function mountDockAlign(): DockAlignHandle | null {
     // 只在真的渲染了我们控件时才接管宽度，插件禁用时宿主恢复原样。
     if (row.querySelector(HOST) === null && row.querySelector('[data-dsh-simplify-hero-host]') === null) {
       row.style.removeProperty(VAR)
+      row.style.removeProperty(INSET)
       return
     }
     if (observed !== card) {
@@ -40,6 +42,9 @@ export function mountDockAlign(): DockAlignHandle | null {
     }
     const width = `${Math.round(card.getBoundingClientRect().width)}px`
     if (row.style.getPropertyValue(VAR) !== width) row.style.setProperty(VAR, width)
+    // 圆角半径随主题变化，读实际值作为左右内缩，使控件起点落在圆角末梢
+    const radius = getComputedStyle(card).borderTopLeftRadius
+    if (radius !== '' && row.style.getPropertyValue(INSET) !== radius) row.style.setProperty(INSET, radius)
   }
 
   const schedule = () => {
@@ -57,7 +62,10 @@ export function mountDockAlign(): DockAlignHandle | null {
       observer?.disconnect()
       mutations.disconnect()
       if (frame !== 0) window.cancelAnimationFrame(frame)
-      for (const row of document.querySelectorAll<HTMLElement>(DOCK_ROW)) row.style.removeProperty(VAR)
+      for (const row of document.querySelectorAll<HTMLElement>(DOCK_ROW)) {
+        row.style.removeProperty(VAR)
+        row.style.removeProperty(INSET)
+      }
     }
   }
 }

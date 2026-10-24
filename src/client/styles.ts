@@ -28,7 +28,7 @@ export const UI_CSS = `
   margin-left: auto;
   margin-right: auto;
   /* 与输入卡片之间留出间距，不再紧贴卡片下缘 */
-  margin-top: 5px;
+  margin-top: 3px;
   /* 宿主只在底部留 4px，补到与左右两侧一致的 16px（--dsh-composer-side-clearance） */
   margin-bottom: calc(var(--dsh-composer-side-clearance, 16px) - 4px);
   position: relative;
@@ -47,9 +47,9 @@ export const UI_CSS = `
   min-width: 0;
 }
 
-/* 行宽与卡片一致，控件再往里收 3px，避免边框压住卡片描边 */
-[data-dsh-simplify-dock-left] { padding-left: 3px; }
-[data-dsh-simplify-dock-right] { padding-right: 3px; }
+/* 控件与卡片圆角末梢对齐：内缩等于卡片圆角半径，视觉上从直边开始 */
+[data-dsh-simplify-dock-left] { padding-left: var(--dsh-simplify-dock-inset-x, 20px); }
+[data-dsh-simplify-dock-right] { padding-right: var(--dsh-simplify-dock-inset-x, 20px); }
 
 /* 两侧等分：中间统计簇才能以卡片中心对齐（不等分时会被宽的一侧挤偏） */
 [data-dsh-simplify-dock-left] {
