@@ -21,6 +21,7 @@ import { mountHeroDock } from './hero-dock'
 import { mountStatColors } from './stat-colors-mount'
 import { mountTurnDuration } from './turn-duration'
 import { mountDelegationPanel } from './delegation-panel'
+import { mountDockAlign } from './dock-align'
 import { CURRENT_SESSION_KEY, readCurrentSessionId } from './hero-dock'
 import { readArchivedFilter, VIEW_STORE_KEY } from './view-state'
 import { withFallback } from './locale-fallback'
@@ -329,6 +330,11 @@ function mountSidebarTabsSafe(ctx: ClientCtx): void {
     const mount = mountStatColors()
     return () => mount?.unmount()
   }, 'simplify-theme: stat colors')
+
+  ctx.effect(() => {
+    const mount = mountDockAlign()
+    return () => mount?.dispose()
+  }, 'simplify-theme: dock align')
 
   ctx.effect(() => {
     const sessions = ctx.sessions?.list
