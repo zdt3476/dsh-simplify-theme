@@ -20,14 +20,15 @@ export const UI_CSS = `
   display: contents;
 }
 
-/* dock 行对齐「对话内容列」，而不是卡片外框：控件两侧留白与消息正文一致 */
+/* dock 行对齐聊天卡片：复用卡片自身的宽度约束，权限/模型贴卡片左右缘 */
 [data-composer-dock]:has([data-dsh-simplify-dock]) {
   box-sizing: border-box;
-  width: min(calc(100% - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset)), var(--dsh-chat-content-width));
-  max-width: none;
+  width: calc(100% - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset));
+  max-width: calc(var(--dsh-composer-card-max-width) - var(--dsh-composer-dock-inset) - var(--dsh-composer-dock-inset));
   margin-left: auto;
   margin-right: auto;
-  padding: 2px 0;
+  /* 宿主只在底部留 4px，补到与左右两侧一致的 16px（--dsh-composer-side-clearance） */
+  margin-bottom: calc(var(--dsh-composer-side-clearance, 16px) - 4px);
   position: relative;
 }
 
@@ -44,9 +45,9 @@ export const UI_CSS = `
   min-width: 0;
 }
 
-/* 行宽已经收在内容列内，这里只需要一点内缩，避免按钮焦点环贴住边界 */
-[data-dsh-simplify-dock-left] { padding-left: 2px; }
-[data-dsh-simplify-dock-right] { padding-right: 2px; }
+/* 控件不贴行边：与卡片内 + 按钮的缩进保持一致，避免看起来挤在桌角 */
+[data-dsh-simplify-dock-left] { padding-left: 6px; }
+[data-dsh-simplify-dock-right] { padding-right: 6px; }
 
 /* 两侧等分：中间统计簇才能以卡片中心对齐（不等分时会被宽的一侧挤偏） */
 [data-dsh-simplify-dock-left] {
