@@ -578,6 +578,8 @@ export const UI_CSS = `
 
 .subagent-topology-connector {
   height: 2px;
+  /* 向右多伸 2px，和竖直主干重叠，避免亚像素缝隙 */
+  margin-right: -2px;
   border-radius: 999px;
   background: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
 }
@@ -593,8 +595,8 @@ export const UI_CSS = `
 .subagent-topology-agents::before {
   content: '';
   position: absolute;
-  top: 36px;
-  bottom: 36px;
+  top: var(--dsh-simplify-trunk-top, 36px);
+  bottom: var(--dsh-simplify-trunk-bottom, 36px);
   left: 0;
   width: 2px;
   border-radius: 999px;
@@ -613,7 +615,8 @@ export const UI_CSS = `
 .subagent-topology-node::before {
   content: '';
   position: absolute;
-  top: 35px;
+  /* 分支线落在节点垂直中线，和内容居中一致 */
+  top: calc(50% - 1px);
   right: 100%;
   width: 15px;
   height: 2px;

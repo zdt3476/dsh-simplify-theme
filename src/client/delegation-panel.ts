@@ -217,6 +217,16 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     agents.setAttribute('role', 'list')
     members.forEach((member, index) => agents.append(nodeView(member, index)))
     section.append(root, connector, agents)
+    // 主干只连首末节点的分支点：固定 36px 会在高矮不一的节点外留出悬空线头。
+    queueMicrotask(() => {
+      const first = agents.firstElementChild as HTMLElement | null
+      const last = agents.lastElementChild as HTMLElement | null
+      if (first === null || last === null) return
+      const top = first.offsetTop + first.offsetHeight / 2
+      const bottom = agents.offsetHeight - (last.offsetTop + last.offsetHeight / 2)
+      agents.style.setProperty('--dsh-simplify-trunk-top', `${Math.max(0, top)}px`)
+      agents.style.setProperty('--dsh-simplify-trunk-bottom', `${Math.max(0, bottom)}px`)
+    })
     return section
   }
 
