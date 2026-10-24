@@ -9,16 +9,29 @@
 - 版本：0.3.0
 - 环境：DSH ≥ 0.2.0；运行时需要 `react` / `react-dom`（由宿主 ModuleLoader 提供）
 
-## 效果对照
+## 当前界面
 
-同一页面、同一缩放，左为内置外观，右为启用本插件后：
+以下截图于 2026-10-24 重新拍摄。侧栏、权限和设置来自启用当前插件的隔离 DSH 预览；
+模型、思考等级及委派图通过当前源码组件在浏览器中渲染，使用演示目录与状态，图内已注明。
+截图采用浅色主题，不代表深色主题的验收结果。
 
-| 内置外观 | 极简主题 |
-| --- | --- |
-| ![启用前：菜单](docs/images/before-menu.png) | ![启用后：菜单](docs/images/after-menu.png) |
-| ![启用前：设置](docs/images/before-settings.png) | ![启用后：设置](docs/images/after-settings.png) |
+模型选择按供应商分列并着色，思考等级独立展开：
 
-最直观的三处差异：菜单从半透明模糊变成不透明白底、浮层投影消失、面板圆角从 28px 收到 20px。
+![当前模型选择面板（演示目录）](docs/images/current-model.png)
+![当前思考等级滑块（演示目录）](docs/images/current-effort.png)
+
+权限入口在输入框右下方，模型与思考等级在左下方。隔离预览未配置模型凭据，
+所以这里的思考等级显示「不可用」：
+
+![当前输入框下方控件与权限面板](docs/images/current-permission.png)
+
+委派图的 1 / 2 / 3 / 4 个子代理布局，包含完成、运行与失败状态（演示数据）：
+
+![当前子代理委派图：四种节点数量](docs/images/current-delegation.png)
+
+设置面板展示当前主题的圆角、描边与中性交互态：
+
+![当前设置面板](docs/images/current-settings.png)
 
 ## 安装
 
@@ -75,8 +88,7 @@ dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/r
 - 右侧下拉写回原生分组状态 `uiWorkspace.view.setGroupBy('workspace' | 'workspace-tree' | 'flat')`
 - `Escape` 清空并收起筛选
 
-![侧栏分页](docs/images/sidebar-tabs.png)
-![工作区筛选](docs/images/sidebar-filter.png)
+![当前侧栏：归档分页、筛选与会话计数](docs/images/current-sidebar.png)
 
 ### 工作区列表排序、置顶与折叠
 
