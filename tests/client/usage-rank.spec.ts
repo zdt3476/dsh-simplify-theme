@@ -1,21 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { collectUsage, rankCatalog } from '../../src/client/usage-rank'
 
-const tokens = (n: number) => ({ projectionValues: { modelSelection: { next: { provider: 'p', model: 'm' } }, tokenUsage: { outputTokens: n } } })
-
 describe('usage ranking', () => {
-  it('按 token 聚合供应商与模型，未记 token 的会话也算一次', () => {
+  it('按会话数聚合供应商与模型，空会话不计', () => {
     const rows = {
-      a: { projectionValues: { modelSelection: { next: { provider: 'openai', model: 'gpt-5' } }, tokenUsage: { uncachedInputTokens: 10, outputTokens: 90 } } },
-      b: { projectionValues: { modelSelection: { next: { provider: 'openai', model: 'gpt-5' } }, tokenUsage: { outputTokens: 50 } } },
+      a: { projectionValues: { modelSelection: { next: { provider: 'openai', model: 'gpt-5' } } } },
+      b: { projectionValues: { modelSelection: { next: { provider: 'openai', model: 'gpt-5' } } } },
       c: { projectionValues: { modelSelection: { provider: 'deepseek', model: 'flash' } } },
       d: { projectionValues: {} }
     }
     const rank = collectUsage(rows)
-    expect(rank.models.get('openai/gpt-5')).toBe(150)
+    expect(rank.models.get('openai/gpt-5')).toBe(2)
     expect(rank.models.get('deepseek/flash')).toBe(1)
-    expect(rank.providers.get('openai')).toBe(150)
+    expect(rank.providers.get('openai')).toBe(2)
     expect(rank.providers.get('deepseek')).toBe(1)
+  })
+
+  it('本地记录叠加在会话计数之上', () => {
+    const rows = {
+      a: { projectionValues: { modelSelection: { next: { provider: 'openai', model: 'gpt-5' } } } }
+    }
+    const local = { providers: { openai: 3, deepseek: 5 }, models: { 'deepseek/flash': 5 } }
+    const rank = collectUsage(rows, local)
+    expect(rank.providers.get('openai')).toBe(4)
+    expect(rank.providers.get('deepseek')).toBe(5)
+    expect(rank.models.get('deepseek/flash')).toBe(5)
+    expect(rank.models.get('openai/gpt-5')).toBe(1)
   })
 
   it('有用的排前面，没用的保持原序', () => {

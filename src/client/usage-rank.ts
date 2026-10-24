@@ -1,32 +1,27 @@
 /**
  * 按使用频率给模型选择排序。
  *
- * 数据来自会话列表快照：每个会话都有 `projectionValues.modelSelection`（当前模型）
- * 和 `projectionValues.tokenUsage`（四桶 token）。把全量会话（含子代理）按
- * 供应商 / 模型聚合，就得到真实的用量分布，不需要额外记录什么。
+ * 两个来源叠加，单位都是「用过几次」：
+ *   1. 会话列表快照：每个会话的 `projectionValues.modelSelection` 记一次；
+ *   2. 本地记录：每次在这里选择模型时累计（清理历史后仍然有效）。
  *
- * 没有用量数据的供应商和模型保持原有顺序并排在后面——目录里的新供应商不该因为
+ * 没有用量数据的供应商和模型保持原有顺序并排在后面——新接入的供应商不该因为
  * "还没人用过"就被打乱位置。
  */
 
 import type { CatalogGroup } from './model-directory'
+import type { LocalUsage } from './usage-store'
 
 export interface UsageRank {
-  /** 供应商 id → 累计 token。 */
+  /** 供应商 id → 累计使用次数。 */
   providers: Map<string, number>
-  /** `provider/model` → 累计 token。 */
+  /** `provider/model` → 累计使用次数。 */
   models: Map<string, number>
 }
 
 interface UsageRow {
   projectionValues?: {
     modelSelection?: { provider?: string; model?: string } | { next?: { provider?: string; model?: string } | null }
-    tokenUsage?: {
-      uncachedInputTokens?: number
-      outputTokens?: number
-      cacheReadTokens?: number
-      cacheWriteTokens?: number
-    }
   }
 }
 
@@ -42,29 +37,27 @@ function selectionOf(row: UsageRow): { provider: string; model: string } | null 
     : null
 }
 
-function tokensOf(row: UsageRow): number {
-  const usage = row.projectionValues?.tokenUsage
-  if (usage === undefined) return 0
-  return (usage.uncachedInputTokens ?? 0) + (usage.outputTokens ?? 0) + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
+function bump(map: Map<string, number>, key: string, amount: number): void {
+  map.set(key, (map.get(key) ?? 0) + amount)
 }
 
 /**
- * 聚合全量会话的用量。
+ * 聚合用量：会话计数 + 本地选择次数。
  * @param rows 会话列表的 byId。
+ * @param local 本地累计记录。
  */
-export function collectUsage(rows: Record<string, UsageRow | undefined>): UsageRank {
+export function collectUsage(rows: Record<string, UsageRow | undefined>, local: LocalUsage = { providers: {}, models: {} }): UsageRank {
   const providers = new Map<string, number>()
   const models = new Map<string, number>()
   for (const row of Object.values(rows)) {
     if (row === undefined) continue
     const selection = selectionOf(row)
     if (selection === null) continue
-    // 一个 token 都没记过的会话也计入「用过一次」，避免新会话权重为 0。
-    const weight = Math.max(1, tokensOf(row))
-    providers.set(selection.provider, (providers.get(selection.provider) ?? 0) + weight)
-    const key = `${selection.provider}/${selection.model}`
-    models.set(key, (models.get(key) ?? 0) + weight)
+    bump(providers, selection.provider, 1)
+    bump(models, `${selection.provider}/${selection.model}`, 1)
   }
+  for (const [id, count] of Object.entries(local.providers)) bump(providers, id, count)
+  for (const [key, count] of Object.entries(local.models)) bump(models, key, count)
   return { providers, models }
 }
 

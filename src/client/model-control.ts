@@ -21,6 +21,8 @@ export interface ModelControlProps {
   shared: DockShared
   /** 打开面板时读取一次用量聚合，用于按使用频率排序。 */
   usage?: () => UsageRank
+  /** 选择模型后记录一次本地使用，用于清理历史后仍保留排序。 */
+  recordSelection?: (provider: string, model: string) => void
 }
 
 export function createModelControl(props: ModelControlProps) {
@@ -96,6 +98,7 @@ export function createModelControl(props: ModelControlProps) {
     const pickModel = (provider: string, model: string, meta?: import('./model-directory').ReasoningMeta) => {
       // 换模型保留原思考档位；目标模型不支持该档位时用它自己的默认档位。
       const nextEffort = retainEffort(meta, selection?.reasoningEffort)
+      props.recordSelection?.(provider, model)
       void directory.select({ provider, model, ...(nextEffort === undefined ? {} : { reasoningEffort: nextEffort }) })
       close()
     }

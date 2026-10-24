@@ -75,6 +75,7 @@ export interface HeroDockOptions {
   sessionOf: (sessionId: string) => PermissionSession | undefined
   permissionValueOf: (sessionId: string) => string | undefined
   usage?: () => import('./usage-rank').UsageRank
+  recordSelection?: (provider: string, model: string) => void
   shared: { h: (type: string, props: Record<string, unknown>, ...children: unknown[]) => unknown; hooks: ReactHooks; t: (key: string) => string }
   React: {
     createRoot: (container: HTMLElement) => { render: (node: unknown) => void; unmount: () => void }
@@ -99,7 +100,7 @@ export function mountHeroDock(options: HeroDockOptions): HeroDockHandle | null {
   const componentFor = (sessionId: string) => {
     const cached = componentCache.get(sessionId)
     if (cached !== undefined) return cached
-    const model = createModelControl({ sessionId, directories: options.directories, usage: options.usage, shared: { h: options.shared.h as never, hooks: options.shared.hooks, t: options.shared.t as never } })
+    const model = createModelControl({ sessionId, directories: options.directories, usage: options.usage, recordSelection: options.recordSelection, shared: { h: options.shared.h as never, hooks: options.shared.hooks, t: options.shared.t as never } })
     const permission = createPermissionControl({
       sessionId,
       remote: options.remote,
