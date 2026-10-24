@@ -304,6 +304,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
       for (const group of groups) {
         const members: BatchMember[] = []
         const groupRows: HTMLElement[] = []
+        const seen = new Set<string>()
         for (const row of group.rows) {
           rowCount += 1
           let ids = pickSubagentIds(row.textContent ?? '', rows, parentId)
@@ -318,7 +319,9 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
           const rawState = row.getAttribute('data-state')
           const abnormal: Abnormal = rawState === 'error' ? 'failed' : rawState === 'denied' ? 'denied' : null
           const nodes = delegationNodesFor(ids, abnormal, rows, now)
-          if (nodes.length === 0) continue
+          // 同一次扇出里同一个子代理只能出现一次（兜底认领可能重复命中）。
+          if (nodes.length === 0 || seen.has(nodes[0].id)) continue
+          seen.add(nodes[0].id)
           members.push({ node: nodes[0], ...(abnormal === null ? {} : { reason: errorReasonOf(row) }) })
           groupRows.push(row)
           if (nodes[0].status === 'running') running = true
