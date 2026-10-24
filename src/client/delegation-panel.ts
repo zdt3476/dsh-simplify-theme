@@ -228,8 +228,8 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
       agents.style.setProperty('--dsh-simplify-trunk-top', `${Math.max(0, trunkTop)}px`)
       agents.style.setProperty('--dsh-simplify-trunk-bottom', `${Math.max(0, agents.offsetHeight - trunkBottom)}px`)
       // 连接线要对准主干中点，而不是整块图形的中点：节点高矮不一时这两者不同。
-      const offset = (trunkTop + trunkBottom) / 2 - agents.offsetHeight / 2
-      connector.style.transform = `translateY(${Math.round(offset)}px)`
+      // 主连接线也交给主干自己画（agents::after），两者共用同一组坐标，不会错开。
+      agents.style.setProperty('--dsh-simplify-trunk-mid', `${Math.round((trunkTop + trunkBottom) / 2)}px`)
     })
     return section
   }

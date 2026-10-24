@@ -576,12 +576,10 @@ export const UI_CSS = `
   line-height: 16px;
 }
 
+/* 网格里保留这一列做间距；真正的横线由主干 ::after 画，保证与竖直段同源 */
 .subagent-topology-connector {
   height: 2px;
-  /* 向右多伸 2px，和竖直主干重叠，避免亚像素缝隙 */
-  margin-right: -2px;
-  border-radius: 999px;
-  background: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
+  background: transparent;
 }
 
 .subagent-topology-agents {
@@ -600,6 +598,18 @@ export const UI_CSS = `
   left: 0;
   width: 2px;
   border-radius: 999px;
+  background: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
+}
+
+/* 主 Agent → 主干的横线：位置取主干中点，宽度跨越整个间距列 */
+.subagent-topology-agents::after {
+  content: '';
+  position: absolute;
+  top: var(--dsh-simplify-trunk-mid, 50%);
+  left: -34px;
+  width: 34px;
+  height: 2px;
+  transform: translateY(-1px);
   background: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
 }
 
