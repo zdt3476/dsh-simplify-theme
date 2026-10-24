@@ -530,7 +530,7 @@ export const UI_CSS = `
   display: flex;
   min-width: 0;
   min-height: 72px;
-  align-items: flex-start;
+  align-items: center;
   gap: 9px;
   padding: 11px;
   border: 1px solid var(--dsw-alias-border-l1);
@@ -627,7 +627,7 @@ export const UI_CSS = `
   width: 100%;
   min-width: 0;
   min-height: 70px;
-  align-items: flex-start;
+  align-items: center;
   gap: 9px;
   padding: 10px;
   border: none;
