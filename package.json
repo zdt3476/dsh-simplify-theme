@@ -1,12 +1,20 @@
 {
   "name": "dsh-simplify-theme",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": false,
   "publishConfig": {
     "access": "public"
   },
   "type": "module",
   "description": "给 DeepSeek Harness 的极简主题，附带侧栏分页与筛选、输入框下方模型/权限控件、子代理委派图等界面增强。",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zdt3476/dsh-simplify-theme.git"
+  },
+  "homepage": "https://github.com/zdt3476/dsh-simplify-theme#readme",
+  "bugs": {
+    "url": "https://github.com/zdt3476/dsh-simplify-theme/issues"
+  },
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
