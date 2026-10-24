@@ -83,9 +83,15 @@ export const UI_CSS = `
   max-width: 260px;
 }
 
-[data-dsh-simplify-pill]:hover:not(:disabled),
-[data-dsh-simplify-pill][aria-expanded='true'] {
+[data-dsh-simplify-pill]:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* 展开态用品牌色淡染，比 hover 更醒目但仍无描边（悬停时也保持淡染） */
+[data-dsh-simplify-pill][aria-expanded='true'],
+[data-dsh-simplify-pill][aria-expanded='true']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--dsh-simplify-provider-color, var(--dsw-alias-state-business-primary)) 10%, transparent);
   color: var(--dsw-alias-label-primary);
 }
 
