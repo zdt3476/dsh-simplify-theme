@@ -1,154 +1,222 @@
 # dsh-simplify-theme
 
-给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的极简主题插件。
+给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的极简主题，外加一组界面增强。
 
-它不改语义色、不改字号，只压掉界面里的装饰性噪音：
+主题部分只做一件事：在当前配色之上叠一层 token，压掉装饰性噪音——去投影、去毛玻璃、
+收紧圆角、气泡与交互态中性化。交互增强部分全部在浏览器侧完成，不新增 Host 行为，
+禁用插件即完全还原。
 
-- 去掉全部投影，浮层只留一圈发丝描边；
-- 菜单改成不透明实底，关掉毛玻璃；
-- 收紧圆角，并退出 `corner-shape: superellipse`；
-- 用户气泡、hover / active 改成中性灰，不再被品牌色染色；
-- 代码块改用贴近画布的中性底。
-
-亮色、暗色、跟随系统都会自动生效，因为插件是在当前配色之上叠一层
-token，而不是新增一个独立主题。
+- 版本：0.3.0
+- 环境：DSH ≥ 0.2.0；运行时需要 `react` / `react-dom`（由宿主 ModuleLoader 提供）
 
 ## 效果对照
 
-左为内置外观，右为启用本插件后（同一页面、同一缩放）：
+同一页面、同一缩放，左为内置外观，右为启用本插件后：
 
 | 内置外观 | 极简主题 |
 | --- | --- |
 | ![启用前：菜单](docs/images/before-menu.png) | ![启用后：菜单](docs/images/after-menu.png) |
 | ![启用前：设置](docs/images/before-settings.png) | ![启用后：设置](docs/images/after-settings.png) |
 
-最容易观察到的三处差异：菜单从半透明模糊变成不透明白底、浮层投影消失、
-设置面板圆角从 28px 收到 20px。
-
-## 功能增强
-
-除配色皮肤外，插件还带三组交互增强：
-
-**侧栏归档分页** — 「工作区」标题下方提供两页 tab（未归档 / 已归档），点击写回 DSH 原生的 `archivedFilter` 视图状态。
-
-**工作区快速筛选** — 使用固定高度的输入行替代原生搜索和视图过滤按钮，旁边保留工作区 / 目录树 / 全部会话分组选择，写回原生分组状态。输入框对已渲染的会话/工作区行做 type-to-filter；命中会话时保留其工作区组头，命中工作区时保留组头本身，Escape 清空筛选。
-
-**输入框下方控件条** — 模型、思考等级、权限三颗控件移到输入框下方的
-dock 行（与上下文用量同一行），输入框内只留附件、模式和发送：
-
-- 模型与思考等级各自独立展开；思考等级入口始终可见，展开后是带填充轨道的滑块（标题行显示当前档位、刻度标出全部档位），拖动预览、释放提交；供应商未声明默认档位时保留「默认」档位，无可调档位时说明不可用；
-- 模型列表按供应商分组（默认 DeepSeek 账号/官方优先），并按真实使用频率重排——权重 = 会话列表里用过该模型的会话数 + 本地选择次数（localStorage 累计，清理历史后仍有效），没用过的保持原序排在后面；每供应商一列并配有专属强调色（列头色点、模型选中底色与勾选同色），供应商过多时自动换行、面板在视口内滚动；面板顶部显示标题与供应商数量；
-- 模型入口默认只显示模型名（长名字更可读），仅当同名模型跨供应商重名时才加 `供应商 / ` 前缀；完整名称在悬停提示里；
-- 切换模型会沿用原来的思考档位，目标模型不支持该档位时回落到它自己的默认档位；
-- 权限控件与内置选择器同源（同一 catalog RPC、同一 `/permission`
-  提交通道），完全权限/自动审查保留两步确认；
-- 入口与 DSH 原生 seat 同规格：28px 高、13px 字号、透明底无描边，悬停或展开时才出现浅灰底；识别依靠供应商色点，权限按风险只染圆点（完全权限额外把文字标红）。
-
-dock 行里的百分比统计按数值上色：缓存命中越高越绿、上下文占用越高越红，中间区间为橙色；环形进度的描边与数字同色。
-
-**子代理委派图** — 结构复刻 [PI-Desktop](https://github.com/vastsa/PI-Desktop) 的
-`SubagentTopology`：左侧「主 Agent」卡片、连接线、右侧子代理节点列表。每个节点带
-头像与状态角标、名称、模型、状态·耗时、失败原因（红字）与步数；运行中的节点有
-旋转指示与「停止」，节点整体可点击进入子会话。同一回合内连续的委派算一批画成一张图，
-中间夹了别的工具调用就另起一张；卡片取代原生 `subagent` 工具行，不再一处信息两遍。
-常驻总览由 DSH 顶部会话血缘入口承担，插件不另做列表。
-
-本轮回答结束后，回复操作行的最右侧会追加该轮耗时（如 `· 耗时 12.3 秒`）。它按会话运行状态的墙钟时间计算，包含排队与流式等待，和原生折叠行的统计口径可能略有差异。
-
-新建会话与普通会话使用相同的下方控件布局：模型和思考等级在卡片左下、权限在右下，控件行与输入卡片等宽（宽度按卡片实际宽度计算，任何窗口宽度下左右边缘都对齐），与卡片留 12px 间距、距窗口底边 16px；原生 tps、Token 用量和上下文统计全部保留在中间。模型/思考弹层沿卡片左缘展开，权限弹层沿右缘展开，均受视口边界约束。
-
-工作区列表提供本地置顶菜单（浮层，不受侧栏裁剪）、可见会话数量徽标和超出 5 个工作区的折叠入口。置顶组优先，其余按当前分页内会话的最近活跃时间降序排列；没有可用会话时采用工作区创建时间。默认保留最近活跃的 5 个普通工作区，置顶不占额度，筛选时暂时展开隐藏组。徽标表示当前已渲染的会话数量，不代表全部历史数量。置顶和折叠偏好只存当前浏览器 localStorage。
-
-| 侧栏分页 | 快速筛选 |
-| --- | --- |
-| ![侧栏归档分页](docs/images/sidebar-tabs.png) | ![工作区筛选](docs/images/sidebar-filter.png) |
-| **dock 控件条** | **权限弹层** |
-| ![dock 控件条](docs/images/dock-controls.png) | ![权限弹层](docs/images/permission-popup.png) |
-
-已知限制：侧栏 tabs/筛选走 DOM 注入（WorkspaceBrowser 未暴露列表上方
-slot），DSH 大版本更新可能需要跟进选择器；dock 弹层是自绘而非
-MenuSurface，键盘导航由 Escape/外点关闭兜底。
-
-## 为什么用 token 层而不是主题 id
-
-DSH 的 `ctx.theme.register()` 可以注册第三方主题 id，但 Appearance 设置
-只列 `light` / `dark` / `system` 三个内置项，注册的 id 没有选择入口，也
-无法跟随系统配色。
-
-本项目改用 `ctx.theme.overrideTokens(source, tokens)`：每个 token 给出
-`{ light, dark }` 一对值，由 ui-theme 按当前配色选值，再经 ui-layout
-写到 `body` 上。未覆盖的 token 全部继承内置值，因此 DSH 升级新增 token
-时不需要跟进。
+最直观的三处差异：菜单从半透明模糊变成不透明白底、浮层投影消失、面板圆角从 28px 收到 20px。
 
 ## 安装
 
-插件包必须构建出 `lib/index.js`、`lib/client.js` 后才能被加载。
-
 ```sh
-pnpm install
-pnpm build
-```
+# npm
+dsh plugin --profile desktop add dsh-simplify-theme
 
-以本地 link 方式装进当前 profile（示例为 Desktop 使用的 `desktop`）：
+# GitHub 源码
+dsh plugin --profile desktop add git+https://github.com/zdt3476/dsh-simplify-theme.git
 
-```sh
+# 本地开发目录（link）
 dsh plugin --profile desktop add link:"$PWD"
+
+# Release 里的预构建包
+dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/releases/download/v0.3.0/dsh-simplify-theme-0.3.0.tgz
 ```
 
-也可以从 GUI 的 **Plugins** 页面安装本地目录。首次安装后需要重启 DSH；
-之后改代码只需 `pnpm build`，再刷新界面（Web/桌面的页面刷新即可，不用重启
-整个应用）——插件包是按页面加载时读取的。
+把 `desktop` 换成你实际使用的 profile（`dsh web` 默认是 `web`）。**首次安装后需要重启 DSH**；
+之后的代码改动只需 `pnpm build` + 刷新页面，不必重启整个应用——插件包是页面加载时读取的。
 
-激活时控制台会打印一行 `[dsh-simplify-theme] 已加载构建 <版本+构建时间>`，同时写到
-`<html data-dsh-simplify-build>`；界面没变化时先比对这行，确认加载的是最新构建。
+激活时控制台会打印一行 `[dsh-simplify-theme] 已加载构建 <版本+构建时间>`，并写到
+`<html data-dsh-simplify-build>`。界面没变化时先比对这行，确认加载的是最新构建。
 
-## 关闭与卸载
+## 主题层
 
-- 临时关闭：Plugins 页面禁用 `dsh-simplify-theme`，token 层被移除后界面
-  立即还原。
-- 彻底卸载：`dsh plugin --profile desktop remove dsh-simplify-theme`。
+`src/client/tokens.ts` 是主题的唯一事实源，通过 `ctx.theme.overrideTokens(source, tokens)`
+叠层，每个 token 给出 `{ light, dark }` 一对值。当前覆盖 25 个 token，分四组：
 
-配色覆盖不修改内置外观偏好；归档 tab 使用原生视图状态，置顶和折叠偏好保存在浏览器 localStorage。插件自带中英文字典，宿主未解析某个键时会用内置文案兜底并在控制台告警一次，避免界面出现内部键名。禁用时移除界面改动，保留这些偏好以便再次启用。
+| 组 | 覆盖内容 |
+| --- | --- |
+| 圆角 | `--dsw-corner-shape` 回到 `round`；xs/sm/md/lg/xl/panel 分别为 3/6/8/12/16/20px |
+| 阴影 | 四档 shadow 全部 `none`；panel/prominent/soft 三档 elevation 退化为发丝描边 |
+| 菜单 | 关闭 `--dsw-menu-backdrop-filter`，菜单与分组头改不透明实底 |
+| 交互与内容 | hover/active 改中性灰；气泡、引用气泡、代码块、行内代码改中性底 |
+
+语义色（品牌蓝、状态色、焦点环）和字号一律不动，因此亮/暗/跟随系统都能直接生效。
+未覆盖的 token 继承内置值，DSH 升级新增 token 时不需要跟进。
+
+## 交互增强
+
+以下功能全部在 Client 侧用 DOM 注入或 slot 注册实现，没有对应的 Host 代码。
+
+### 侧栏归档分页
+
+「工作区」标题下方两页 tab（未归档 / 已归档）。点击写回原生视图状态
+`uiWorkspace.view.setArchivedFilter('default' | 'only')`，高亮从 `dsh.workspace.view.v5`
+轮询同步，因此原生「视图选项」里的手动切换也能反映出来。
+
+### 侧栏筛选行
+
+用一个固定高度的输入行替换原生的搜索按钮与视图过滤按钮（这两个原生控件被隐藏）：
+
+- 输入即筛选已渲染的会话/工作区行；命中会话时保留其工作区组头，命中工作区时保留组头本身
+- 右侧下拉写回原生分组状态 `uiWorkspace.view.setGroupBy('workspace' | 'workspace-tree' | 'flat')`
+- `Escape` 清空并收起筛选
+
+![侧栏分页](docs/images/sidebar-tabs.png)
+![工作区筛选](docs/images/sidebar-filter.png)
+
+### 工作区列表排序、置顶与折叠
+
+- **排序**：置顶组优先，其余按「当前分页内会话的最近 `updatedAt`」降序；没有可用会话时用工作区
+  `createdAt`。归档页按归档会话的时间单独计算。
+- **折叠**：默认只显示最近活跃的 5 个普通工作区，更多收进「还有 N 个工作区」；置顶不占额度；
+  筛选时临时展开被折叠的组。
+- **置顶**：表头「置顶」按钮打开浮层（挂在 body 上，不受侧栏 `overflow: hidden` 裁剪），
+  选完自动收起，`Escape` 或点外部关闭。
+- **徽标**：工作区行右侧显示当前可见会话数，悬停提示同样内容。
+
+### 输入框下方的控件条
+
+模型、思考等级、权限三颗控件移到输入卡片下方的 dock 行：**模型与思考等级在左，权限在右**，
+原生 tps / Token 用量 / 上下文统计保留在中间。
+
+- 入口与宿主原生 seat 同规格：28px 高、13px 字号、透明底无描边，悬停或展开才出现
+  浅灰底 / 品牌色淡染；模型入口带供应商色点
+- **模型面板**：按供应商分列，每列一个专属色（列头色点、选中项左侧色条与勾选同色）；
+  默认只显示模型名，仅当同名模型跨供应商重名时才加 `供应商 / ` 前缀，完整名称在悬停提示里
+- **模型排序**：面板打开时按使用频率重排——权重 = 会话列表里用过该模型的会话数 +
+  本地选择次数；没用过的供应商/模型保持原序排在后面
+- **思考等级**：range 滑块带填充轨道，标题行显示当前档位，刻度文字按档位比例对齐；
+  供应商未声明默认档位时保留「默认」档位；切换模型会沿用原档位，目标模型不支持时回落到它
+  自己的默认档位
+- **权限**：与原生选择器同源（同一 `permissionPresets.catalog` RPC、同一 `/permission` 提交通道），
+  完全权限 / 自动审查保留两步确认；按风险只染色圆点，完全权限额外把文字标红
+- **几何**：控件行宽度由运行时读取输入卡片实际宽度决定（`ResizeObserver` 写入
+  `--dsh-simplify-card-width`），左右各内缩「卡片圆角半径」的距离与圆角末梢对齐，
+  距卡片 5px、距窗口底边 16px
+- 新建会话（hero）与普通会话共用同一套控件；hero 态下宿主不渲染 dock slot，由插件注入
+
+### 缓存命中与上下文占用按值着色
+
+- `[data-composer-stat="usage"]` 里的「缓存命中 N%」：≥80% 绿、≥50% 橙、其余红
+- 上下文环的 `N%`：≤50% 绿、≤75% 橙、其余红；环的描边与数字同色
+
+### 每轮耗时
+
+一轮结束时在回复操作行的最右侧追加「· 耗时 12.3 秒」。计时来自会话 `running` 状态翻转的
+墙钟时间（<1s 显示毫秒，>1min 显示分秒）；DOM 未就绪时按 0 / 120 / 400ms 重试写入。
+
+### 子代理委派图
+
+每一批委派在它发生的位置画一张单层图（结构参考 PI-Desktop 的 `SubagentTopology`）：
+左侧「主 Agent」卡片 → 连接线 → 右侧子代理节点。
+
+- 分组：同一回合内连续出现的委派算一批；中间夹了别的工具调用就另起一张
+- 节点：状态角标、名称（单行省略，完整名在提示里）、模型、思考等级、状态·耗时、步数；
+  失败节点红字显示错误原因（取自工具行的错误输出）；运行中节点带旋转指示与「停止」
+- 状态：已完成 / 运行中 / 失败 / 已拒绝；点击节点进入对应子会话
+- 连线：按真实几何绘制（SVG），主干覆盖首末分支，主 Agent 横线固定在主干正中
+- 原生 `subagent` 工具行被卡片取代（`display: none`，插件禁用即恢复），同一件事不再出现两次
+- 数据：会话列表快照（`origin: 'subagent'` + `parentId` + `projectionValues`）；工具行里拿不到
+  子会话 id 时按快照顺序兜底认领；节点缺统计时主动调一次
+  `sessions.refreshProjections(父会话)` 补齐
+
+### 文案本地化
+
+插件自带中英文字典并注册给宿主 locale。宿主未解析某个键（返回键名）时使用内置文案，并在
+控制台告警一次，因此界面不会出现 `filter.placeholder` 这类内部键。档位名（minimal / low /
+high…）与内置供应商名也做了中文映射。
+
+## 数据与本地存储
+
+| 键 | 用途 | 写入方 |
+| --- | --- | --- |
+| `dsh-simplify-theme.pinned-workspaces` | 置顶的工作区 id 列表 | 插件 |
+| `dsh-simplify-theme.workspaces-expanded` | 是否展开全部工作区 | 插件 |
+| `dsh-simplify-theme.usage` | 本地累计的模型选择次数（排序权重） | 插件 |
+| `dsh-simplify-theme.debug` | 设为 `'1'` 时打印委派图扫描统计 | 手动 |
+| `dsh.workspace.view.v5` | 归档过滤、分组方式（宿主视图状态） | 宿主；插件只调视图方法 |
+| `dsh.sessions.current` | 当前会话 id（只读） | 宿主 |
+
+本地存储只保存上述偏好与计数，不包含会话内容。清理浏览器数据会重置本地计数，排序退回
+会话统计。
+
+## 工作原理
+
+- **Host 半**（`src/host/index.ts`）：空插件，只为让 Loader 有条目并下发 `dsh.client` 清单
+- **Client 半**（`src/client/index.ts`）激活时注册五项：locale 字典、token 层、全局样式、
+  侧栏注入、dock 控件；每一步用 `step()` 包裹，单步失败不影响其余功能
+- Client 半打成 CJS，用 `window.__ModuleLoader__.load({ id, factory })` 包成浏览器插件包；
+  React 不进 bundle，通过 `require('react')` 由宿主提供
+
+注入依赖的稳定钩子（DSH 升级时优先检查这些选择器）：
+
+```
+[data-slot="sidebar.workspaces"]              侧栏列表插槽
+[data-row-key^="workspace:"]                  工作区行
+[data-slot="conversation.input.dock"]         输入区上方 dock
+[data-composer-card] / [data-composer-dock]   输入卡片与控件行
+[data-chat-turn] / [data-chat-node-key]       回合与聊天节点
+[data-tool]                                   工具行（含 data-state）
+[data-clock="end"]                            消息操作行
+```
+
+## 已知限制
+
+- 主题只覆盖 token；组件里写死的颜色或阴影不会受影响
+- Appearance 设置里没有独立主题入口，这是 DSH 当前设置 schema 的限制（本插件走 token 叠层，
+  因此也不需要在设置里选择）
+- 侧栏 tabs / 筛选 / 工作区排序、控件条、统计着色、回合耗时、委派图都依赖上表选择器；
+  DSH 大版本更新可能需要跟进
+- 委派图只画一层父子关系，不显示子代理再委派的后代；状态只区分宿主暴露的
+  运行中/已完成/失败/已拒绝，`timed_out`、`aborted` 等终止态在会话行里没有稳定字段，未做推断
+- 委派图依赖会话列表快照：从未打开过、且投影尚未拉取的子代理可能只显示标题与状态，
+  统计会在补齐后出现；`mode: 'external'` 的子代理不会出现在快照里
+- 回合耗时是运行状态的墙钟观察值，包含排队与流式等待，口径可能和原生折叠行略有差异
+- 统计着色只作用于「缓存命中」标签与上下文环的百分比，其它数字不动
+- dock 弹层是自绘而非 MenuSurface，键盘导航由 Escape / 外点关闭兜底
 
 ## 开发
 
 ```sh
-pnpm test        # typecheck + vitest
+pnpm install
+pnpm test        # 类型检查 + vitest（当前 59 项）
 pnpm build       # 产出 lib/index.js（Host）与 lib/client.js（Client）
-pnpm check       # 上面两步
+pnpm check       # test + build
 ```
-
-项目结构与 [dsh-metrics](https://github.com/zdt3476/dsh-metrics) 保持一致：
 
 | 路径 | 作用 |
 | --- | --- |
-| `src/host/index.ts` | 空 Host 插件，只为让 Loader 有条目并下发 `dsh.client` |
-| `src/client/index.ts` | Client 入口，激活时注册 token 层，卸载时移除 |
-| `src/client/tokens.ts` | 主题的唯一事实源，所有覆盖值都在这里 |
+| `src/host/index.ts` | 空 Host 插件 |
+| `src/client/index.ts` | Client 入口：注册字典、token 层、样式与各项注入 |
+| `src/client/tokens.ts` | 主题的唯一事实源，所有覆盖值在这里 |
+| `src/client/styles.ts` | 全部运行期样式（dock、侧栏、委派图、统计着色…） |
+| `src/client/sidebar-*.ts` | 侧栏分页、筛选、排序/置顶/折叠 |
+| `src/client/model-*.ts`、`permission-*.ts` | 模型与权限控件、目录数据、本地化映射 |
+| `src/client/delegation-*.ts` | 委派图的几何、分组与节点渲染 |
+| `src/client/turn-duration.ts`、`stat-colors*.ts` | 回合耗时与百分比着色 |
+| `src/client/usage-*.ts` | 模型使用频率统计与排序 |
+| `tests/client/` | 纯逻辑单测（token 形状、排序、解析、格式化等） |
 | `cordis.patch.yml` | bundle patch，插入 `simplify-theme` 条目 |
-| `tests/` | token 形状与入口注册行为的单元测试 |
 
-Client 半由 tsdown 打成 CJS，并用 `window.__ModuleLoader__.load({...})`
-包成 DSH 浏览器插件包；不需要手写 bundle。
+调整主题：只改 `src/client/tokens.ts`，然后 `pnpm build` 并刷新页面。新增覆盖时注意——
+key 必须是 `--dsw-*`，值必须是 `{ light, dark }`，优先引用语义 alias 而不是复制色值。
 
-### 调整主题
-
-只改 `src/client/tokens.ts`，然后 `pnpm build` 并重启（或等 HMR 重载）。
-新增覆盖时注意：
-
-- key 必须是 `--dsw-*`；值必须是 `{ light, dark }` 而不是裸字符串，否则
-  用户切换配色后会直接不可读；
-- 优先用语义 alias（如 `--dsw-alias-*`、`--dsw-specific-*`），不要直接
-  改静态色板 `--dsw-static-*`；
-- 能用现有 alias 引用表达的就引用（`var(--dsw-...)`），别复制色值。
-
-## 已知限制
-
-- 主题只做 token 覆盖，不改组件结构；某个组件写死了颜色或阴影时它不会被
-  影响。
-- 没有 Appearance 里的独立入口，这受 DSH 当前设置 schema 限制。
-- 未覆盖的 token 保持内置值，因此这不是一套完整的第三方配色，而是叠在
-  内置亮暗主题上的皮肤。
+调试委派图：控制台执行 `localStorage.setItem('dsh-simplify-theme.debug','1')` 后刷新，
+每次扫描会打印「工具行 N 条，兜底 M 条，会话 <id>」。
 
 ## License
 

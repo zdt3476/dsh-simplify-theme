@@ -6,7 +6,7 @@
     "access": "public"
   },
   "type": "module",
-  "description": "给 DeepSeek Harness 的极简主题：去毛玻璃、去投影、收紧圆角、中性化气泡与交互态，亮暗与跟随系统自动生效。",
+  "description": "给 DeepSeek Harness 的极简主题，附带侧栏分页与筛选、输入框下方模型/权限控件、子代理委派图等界面增强。",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
