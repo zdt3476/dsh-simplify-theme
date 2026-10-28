@@ -419,7 +419,7 @@ function registerDock(ctx: ClientCtx): void {
         sessionId: string
         directories: ModelDirectories
         remote: ClientCtx['remote']
-        useProjection: (key: 'permissions') => { currentValue: string } | undefined
+        useProjection: (key: string) => unknown
         session: () => PermissionSession | undefined
       }
       const ref = hooks.useRef<{ sessionId: string; control: ReturnType<typeof createDockControl> } | null>(null)

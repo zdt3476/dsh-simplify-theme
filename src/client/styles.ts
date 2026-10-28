@@ -34,9 +34,10 @@ export const UI_CSS = `
   position: relative;
 }
 
-/* 统计项（activity / usage / 上下文表）保持在流内，由两侧 auto margin 挤到中间聚簇 */
-[data-composer-dock]:has([data-dsh-simplify-dock]) [data-composer-stat] {
-  white-space: nowrap;
+/* 隐藏原生底部统计胶囊与上下文环，由本插件的平铺状态栏接管 */
+[data-composer-dock]:has([data-dsh-simplify-dock]) [data-composer-stat],
+[data-composer-dock]:has([data-dsh-simplify-dock]) > span:has(> button > svg) {
+  display: none !important;
 }
 
 [data-dsh-simplify-dock-left],
@@ -56,6 +57,41 @@ export const UI_CSS = `
   order: -1;
   flex: 1 1 0;
   justify-content: flex-start;
+}
+
+/* 中间平铺统计栏：紧凑居中对齐、单行不换行、等宽数字 */
+[data-dsh-simplify-dock-center] {
+  order: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-secondary);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+  user-select: none;
+}
+
+.dsh-simplify-stat-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.dsh-simplify-stat-item:hover {
+  background-color: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, 0.05));
+  color: var(--dsw-alias-label-primary);
+}
+
+.dsh-simplify-stat-sep {
+  color: var(--dsw-alias-label-caption, var(--dsw-alias-label-tertiary));
+  opacity: 0.6;
 }
 
 [data-dsh-simplify-dock-right] {

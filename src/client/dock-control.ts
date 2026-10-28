@@ -13,13 +13,14 @@
 import type { ModelDirectories } from './model-directory'
 import { createModelControl } from './model-control'
 import { createPermissionControl } from './permission-control'
+import { createDockStats } from './dock-stats'
 import type { DockShared, H } from './dock-shared'
 
 export interface DockHostProps {
   sessionId: string
   directories: ModelDirectories
   remote: { permissionPresets: { catalog: () => Promise<{ ok: boolean; value?: import('./permission-catalog').PermissionCatalog; error?: { code: string; message: string } }> } }
-  useProjection: (key: 'permissions') => { currentValue: string } | undefined
+  useProjection: (key: string) => unknown
   session: () => import('./permission-control').PermissionSession | undefined
   shared: DockShared
   usage?: () => import('./usage-rank').UsageRank
@@ -35,13 +36,15 @@ export function createDockControl(props: DockHostProps) {
     session: props.session,
     shared: props.shared
   })
+  const stats = createDockStats(props.shared)
   const h = props.shared.h
 
   return function DockControl() {
     // slot 路径：标准 hook 读会话权限投影，作为 runtime 值下传。
-    const projection = props.useProjection('permissions')
+    const projection = props.useProjection('permissions') as { currentValue: string } | undefined
     return h('div', { 'data-dsh-simplify-dock': '' },
       h('div', { 'data-dsh-simplify-dock-left': '' }, h(model as never, {})),
+      h(stats as never, { useProjection: props.useProjection }),
       h('div', { 'data-dsh-simplify-dock-right': '' }, h(permission as never, { permissionValue: projection?.currentValue }))
     )
   }

@@ -6,7 +6,7 @@
 收紧圆角、气泡与交互态中性化。交互增强部分全部在浏览器侧完成，不新增 Host 行为，
 禁用插件即完全还原。
 
-- 版本：0.3.4
+- 版本：0.3.5
 - 环境：DSH ≥ 0.2.0；运行时需要 `react` / `react-dom`（由宿主 ModuleLoader 提供）
 
 ## 当前界面
@@ -46,7 +46,7 @@ dsh plugin --profile desktop add git+https://github.com/zdt3476/dsh-simplify-the
 dsh plugin --profile desktop add link:"$PWD"
 
 # Release 里的预构建包
-dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/releases/download/v0.3.4/dsh-simplify-theme-0.3.4.tgz
+dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/releases/download/v0.3.5/dsh-simplify-theme-0.3.5.tgz
 ```
 
 把 `desktop` 换成你实际使用的 profile（`dsh web` 默认是 `web`）。**首次安装后需要重启 DSH**；
@@ -121,10 +121,15 @@ dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/r
   距卡片 5px、距窗口底边 16px
 - 新建会话（hero）与普通会话共用同一套控件；hero 态下宿主不渲染 dock slot，由插件注入
 
-### 缓存命中与上下文占用按值着色
+### 底部栏平铺上下文与真实 TPS（取代弹窗胶囊）
 
-- `[data-composer-stat="usage"]` 里的「缓存命中 N%」：≥80% 绿、≥50% 橙、其余红
-- 上下文环的 `N%`：≤50% 绿、≤75% 橙、其余红；环的描边与数字同色
+参考 PI-Desktop 的上下文指标设计，将原生需要点击弹出的统计胶囊（`ActivityPill` / `UsagePill`）与抽象的上下文环替换为输入框下方的**平铺状态流**：
+
+- **上下文容量**：直接平铺 `已用 / 窗口上限 (百分比)`（如 `121k / 500k (24%)`），告别看不清上限的盲盒感；超过 75% 预警黄、超过 90% 警戒红
+- **真实端到端 TPS**：严格将首字延迟（TTFT，包含排队与推理思考等待）计入总耗时，彻底消除仅统计吐字片段导致的虚高数值（如原本虚高标出 200+ t/s，真实端到端显示为 27.2 t/s）
+- **Prompt 缓存命中率**：保留按数值颜色分级（≥80% 绿、≥50% 橙、其余红）
+- **最新一轮耗时**：实时展示最新单轮总等待时长（如 `4.2 秒`）
+- **悬停 Tooltip**：鼠标悬停在各段上可查看完整 Token 构成（输入/输出/缓存读取明细）与延迟拆解（首字延迟与纯吐字速率）
 
 ### 每轮耗时
 
