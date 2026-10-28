@@ -6,7 +6,7 @@
 收紧圆角、气泡与交互态中性化。交互增强部分全部在浏览器侧完成，不新增 Host 行为，
 禁用插件即完全还原。
 
-- 版本：0.3.3
+- 版本：0.3.4
 - 环境：DSH ≥ 0.2.0；运行时需要 `react` / `react-dom`（由宿主 ModuleLoader 提供）
 
 ## 当前界面
@@ -46,7 +46,7 @@ dsh plugin --profile desktop add git+https://github.com/zdt3476/dsh-simplify-the
 dsh plugin --profile desktop add link:"$PWD"
 
 # Release 里的预构建包
-dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/releases/download/v0.3.3/dsh-simplify-theme-0.3.3.tgz
+dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/releases/download/v0.3.4/dsh-simplify-theme-0.3.4.tgz
 ```
 
 把 `desktop` 换成你实际使用的 profile（`dsh web` 默认是 `web`）。**首次安装后需要重启 DSH**；
@@ -142,10 +142,8 @@ dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/r
   失败节点红字显示错误原因（取自工具行的错误输出）；运行中节点带旋转指示与「停止」
 - 状态：已完成 / 运行中 / 失败 / 已拒绝；点击节点进入对应子会话
 - 连线：按真实几何绘制（SVG），主干覆盖首末分支，主 Agent 横线固定在主干正中
-- 只有能明确关联子会话的原生 `subagent` 工具行才被卡片取代（`display: none`，插件禁用即恢复）；
-  无法识别会话 ID 时保留原工具行，不猜测关联
-- 数据：会话列表快照（`origin: 'subagent'` + `parentId` + `projectionValues`），并从工具行文本中
-  匹配子会话 UUID；节点缺统计时主动调一次 `sessions.refreshProjections(父会话)` 补齐
+- 支持 `subagent`、`subagent_fork` 与 `spawn_teammate` 等委派工具；原生工具行被卡片取代（`display: none`，插件禁用即恢复）
+- 数据：优先通过显式 UUID 与描述匹配，宿主折叠时按会话目录创建时序单次认领；节点缺统计时主动调一次 `sessions.refreshProjections(父会话)` 补齐
 
 ### 文案本地化
 
@@ -196,8 +194,8 @@ high…）与内置供应商名也做了中文映射。
   DSH 大版本更新可能需要跟进
 - 委派图只画一层父子关系，不显示子代理再委派的后代；状态只区分宿主暴露的
   运行中/已完成/失败/已拒绝，`timed_out`、`aborted` 等终止态在会话行里没有稳定字段，未做推断
-- 委派图依赖工具行中可识别的子会话 UUID 和会话列表快照；拿不到 ID 或匹配不到快照时，
-  只保留原生工具行，无法显示摘要。投影不完整时统计可能缺失；`mode: 'external'` 的子代理不会出现在快照里
+- 委派图依赖会话列表快照与目录时序：从未打开过且投影尚未拉取的子代理可能只显示标题与状态，
+  统计会在补齐后出现；`mode: 'external'` 的子代理不会出现在快照里
 - 回合耗时是运行状态的墙钟观察值，包含排队与流式等待，口径可能和原生折叠行略有差异
 - 统计着色只作用于「缓存命中」标签与上下文环的百分比，其它数字不动
 - dock 弹层是自绘而非 MenuSurface，键盘导航由 Escape / 外点关闭兜底

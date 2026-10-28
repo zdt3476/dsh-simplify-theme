@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { delegationDuration, selectionEffort, selectionModel, toDelegationNode } from '../../src/client/delegation-tree'
-import { delegationNodesFor, errorReasonOf, formatDelegationDuration, isDelegationTool, pickSubagentIds, batchCounts, type BatchMember } from '../../src/client/delegation-panel'
+import { delegationNodesFor, errorReasonOf, formatDelegationDuration, isDelegationTool, pickSubagentIds, matchSubagentId, batchCounts, type BatchMember } from '../../src/client/delegation-panel'
 
 const rows = {
   child1: {
@@ -85,6 +85,7 @@ describe('per-delegation matching', () => {
   it('识别委派工具名', () => {
     expect(isDelegationTool('subagent')).toBe(true)
     expect(isDelegationTool('subagent_fork')).toBe(true)
+    expect(isDelegationTool('spawn_teammate')).toBe(true)
     expect(isDelegationTool('bash')).toBe(false)
     expect(isDelegationTool(null)).toBe(false)
   })
@@ -94,6 +95,40 @@ describe('per-delegation matching', () => {
     expect(pickSubagentIds(text, { '11111111-1111-1111-1111-111111111111': { origin: 'subagent', parentId: 'p' } }, 'p')).toEqual(['11111111-1111-1111-1111-111111111111'])
     expect(pickSubagentIds(text, { '11111111-1111-1111-1111-111111111111': { origin: 'subagent', parentId: 'other' } }, 'p')).toEqual([])
     expect(pickSubagentIds('没有 id', store, 'p')).toEqual([])
+  })
+
+  it('真实宿主折叠时无 UUID，优先按描述/标题匹配，次优按时序认领，且全局不重复', () => {
+    const child1 = { id: '11111111-1111-1111-1111-111111111111', displayTitle: 'Inspect server disconnect', origin: 'subagent', parentId: 'session-root' }
+    const child2 = { id: '22222222-2222-2222-2222-222222222222', displayTitle: 'Inspect client disconnect', origin: 'subagent', parentId: 'session-root' }
+    const child3 = { id: '33333333-3333-3333-3333-333333333333', displayTitle: 'Trace proxy', origin: 'subagent', parentId: 'session-root' }
+    const sessionStore = {
+      [child1.id]: child1,
+      [child2.id]: child2,
+      [child3.id]: child3
+    }
+    const claimed = new Set<string>()
+
+    // 第 1 行：文字包含描述（无 UUID），命中第 1 个子代理
+    const row1Text = '子智能体 Inspect server disconnect · 已启动'
+    expect(matchSubagentId(row1Text, sessionStore, 'session-root', claimed, [child1.id, child2.id, child3.id]))
+      .toBe(child1.id)
+    claimed.add(child1.id)
+
+    // 第 2 行：文字只有泛化提示（无 UUID 且无描述），按时序认领第 2 个子代理
+    const row2Text = '子智能体 运行中'
+    expect(matchSubagentId(row2Text, sessionStore, 'session-root', claimed, [child1.id, child2.id, child3.id]))
+      .toBe(child2.id)
+    claimed.add(child2.id)
+
+    // 第 3 行：显式带 UUID，即使顺序在前也认领自身
+    const row3Text = `子代理 finished ${child3.id}`
+    expect(matchSubagentId(row3Text, sessionStore, 'session-root', claimed, [child1.id, child2.id, child3.id]))
+      .toBe(child3.id)
+    claimed.add(child3.id)
+
+    // 全部认领完后不再盲目返回，防止干扰普通工具行
+    expect(matchSubagentId('子智能体 extra', sessionStore, 'session-root', claimed, [child1.id, child2.id, child3.id]))
+      .toBeUndefined()
   })
 
   it('一条工具行只产出一张卡，异常态覆盖运行态', () => {

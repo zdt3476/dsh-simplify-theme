@@ -180,14 +180,17 @@ test('切换会话并替换聊天内容，不残留旧摘要与展开状态', as
   assert.deepEqual(await page.locator('.subagent-topology-node-title').allTextContents(), ['Delta'])
 })
 
-test('无法识别子会话时保留原工具行，不猜测关联', async t => {
+test('子代理全部认领后，多余的工具行保留原生展示', async t => {
   const page = await setup(t, { batches: false })
   await waitCount(page, hosts, 1)
-  await page.locator('[data-chat-node-key="one"] [data-tool]').evaluate(el => { el.textContent = '无子会话标识' })
-  await page.evaluate(() => window.fixture.listener())
-  await page.waitForFunction(() => !document.querySelector('[data-chat-node-key="one"] [data-tool]')?.hasAttribute('data-dsh-simplify-delegation-source'))
+  // session-a 下共有 A、B、C 三个子代理；注入两个多余工具行（一个将认领 C，另一个无会话可认领）
+  await page.evaluate(({ C }) => {
+    document.querySelector('#step').insertAdjacentHTML('beforeend', `<div data-chat-turn="turn-1" data-chat-node-key="new"><div data-tool="subagent">${C}</div></div><div data-chat-turn="turn-1" data-chat-node-key="extra"><div data-tool="subagent">extra without session</div></div>`)
+    window.fixture.listener()
+  }, { C })
+  await page.waitForFunction(() => document.querySelector('[data-chat-node-key="extra"] [data-tool]') && !document.querySelector('[data-chat-node-key="extra"] [data-tool]')?.hasAttribute('data-dsh-simplify-delegation-source'))
   await page.locator(summary).click()
-  assert.deepEqual(await page.locator('.subagent-topology-node-title').allTextContents(), ['Beta'])
+  assert.deepEqual(await page.locator('.subagent-topology-node-title').allTextContents(), ['Alpha', 'Beta', 'Gamma'])
 })
 
 test('连续追加委派时更新同一摘要而不留下旧卡片', async t => {
@@ -200,6 +203,54 @@ test('连续追加委派时更新同一摘要而不留下旧卡片', async t => 
   await page.waitForFunction(() => document.querySelector('.subagent-topology-summary-counts')?.textContent.includes('3 agents'))
   assert.equal(await page.locator(hosts).count(), 1)
   assert.equal(await page.locator(summary).getAttribute('aria-expanded'), 'true')
+})
+
+test('模拟真实宿主折叠工具行（无 UUID，仅描述与状态文本），正常生成委派卡片并准确匹配', async t => {
+  const page = await browser.newPage()
+  t.after(() => page.close())
+  await page.goto(`${origin}/fixture`)
+  await page.evaluate(async ({ A, B }) => {
+    const { mountDelegationPanel } = await import('/src/client/delegation-panel.ts')
+    const { UI_CSS } = await import('/src/client/styles.ts')
+    const style = document.createElement('style')
+    style.textContent = UI_CSS
+    document.head.append(style)
+    const child = (id, title) => ({
+      id, origin: 'subagent', parentId: 'session-live', displayTitle: title, running: false,
+      projectionValues: { modelSelection: { model: 'model-a' }, sessionStats: { steps: 2 }, subagentTiming: { settledMs: 5000 } }
+    })
+    const state = window.fixture = {
+      session: 'session-live',
+      rows: { [A]: child(A, 'Inspect server disconnect'), [B]: child(B, 'Inspect client disconnect') },
+      listener: () => {}, opened: [], stopped: []
+    }
+    // 真实宿主结构：工具行折叠时只有子智能体文字和描述，完全无 UUID
+    document.querySelector('#chat').innerHTML = `<div id="step" data-step-process data-chat-turn="turn-1">
+      <div data-chat-turn="turn-1" data-chat-node-key="k1"><div data-tool="subagent" data-state="ok"><span>子智能体</span><span>Inspect server disconnect · 已完成</span></div></div>
+      <div data-chat-turn="turn-1" data-chat-node-key="k2"><div data-tool="subagent" data-state="ok"><span>子智能体</span><span>Inspect client disconnect · 已完成</span></div></div>
+    </div>`
+    const dict = { 'delegation.batch': p => `Batch ${p.index}`, 'delegation.agents': p => `${p.count} agents`,
+      'delegation.state.done': () => 'Done', 'delegation.state.running': () => 'Running',
+      'delegation.state.failed': () => 'Failed', 'delegation.steps': p => `${p.count} steps`,
+      'duration.s': () => 's', 'duration.m': () => 'm' }
+    state.handle = mountDelegationPanel({
+      sessions: {
+        getSnapshot: () => ({ byId: state.rows, projectionsBySession: { 'session-live': { values: { subagentCatalog: [{ id: A, label: 'Inspect server disconnect' }, { id: B, label: 'Inspect client disconnect' }] } } } }),
+        subscribe: fn => { state.listener = fn; return () => { state.listener = () => {} } }
+      },
+      currentSessionId: () => state.session,
+      locale: (key, params = {}) => dict[key]?.(params) ?? key,
+      openSession: id => state.opened.push(id)
+    })
+  }, { A, B })
+
+  await waitCount(page, hosts, 1)
+  assert.equal(await page.locator('.subagent-topology-summary-counts').textContent(), '2 agents · 2 Done')
+  await page.locator(summary).click()
+  assert.deepEqual(await page.locator('.subagent-topology-node-title').allTextContents(), ['Inspect server disconnect', 'Inspect client disconnect'])
+  // 点击能正确打开对应子代理会话
+  await page.locator('.subagent-topology-node-header').first().click()
+  assert.deepEqual(await page.evaluate(() => window.fixture.opened), [A])
 })
 
 test('卸载后删除摘要并恢复原工具行', async t => {

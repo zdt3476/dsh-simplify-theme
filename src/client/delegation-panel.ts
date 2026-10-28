@@ -10,7 +10,7 @@
  * 数据来自会话列表快照；失败原因取工具行的错误输出；运行中的节点提供停止按钮。
  */
 
-import { toDelegationNode, type DelegationNode, type SessionRows } from './delegation-tree'
+import { toDelegationNode, type DelegationNode, type SessionRow, type SessionRows } from './delegation-tree'
 
 const TURN = '[data-chat-turn]'
 const TOOL_ROW = '[data-tool]'
@@ -21,7 +21,7 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 const UUID_ONLY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function isDelegationTool(name: string | null): boolean {
-  return name !== null && /(^|[_-])subagent([_-]|$)/i.test(name)
+  return name !== null && (/(^|[_-])subagent([_-]|$)/i.test(name) || name === 'spawn_teammate')
 }
 
 export function pickSubagentIds(text: string, rows: SessionRows, parentId: string | undefined): string[] {
@@ -33,6 +33,53 @@ export function pickSubagentIds(text: string, rows: SessionRows, parentId: strin
     if (!ids.includes(id)) ids.push(id)
   }
   return ids
+}
+
+/**
+ * 匹配委派工具行对应的子代理：
+ * 1. 显式 UUID 匹配（展开状态、提示词或测试环境携带）。
+ * 2. 描述/标题匹配（折叠状态下宿主工具行显示的 description / title）。
+ * 3. 时序认领（同父会话下按创建时序推进认领），全局单次认领，避免跨轮或多次重复。
+ */
+export function matchSubagentId(
+  rowText: string,
+  rows: SessionRows,
+  parentId: string | undefined,
+  claimed: ReadonlySet<string>,
+  candidateIds?: readonly string[]
+): string | undefined {
+  const matchesParent = (p: string | undefined) =>
+    parentId === undefined || p === parentId || (p !== undefined && p.replace(/^session-/, '') === parentId.replace(/^session-/, ''))
+
+  // 1. 显式 UUID 优先
+  const explicit = pickSubagentIds(rowText, rows, parentId)
+  for (const id of explicit) {
+    if (!claimed.has(id)) return id
+  }
+
+  const candidates: Array<{ id: string; row: SessionRow }> = candidateIds !== undefined
+    ? candidateIds
+        .map((id) => ({ id, row: rows[id] }))
+        .filter((c): c is { id: string; row: SessionRow } => c.row !== undefined && c.row.origin === 'subagent' && matchesParent(c.row.parentId))
+    : Object.entries(rows)
+        .filter((entry): entry is [string, SessionRow] => entry[1] !== undefined && entry[1].origin === 'subagent' && matchesParent(entry[1].parentId))
+        .map(([id, row]) => ({ id, row }))
+
+  // 2. 描述 / 标题包含匹配
+  for (const { id, row } of candidates) {
+    if (claimed.has(id)) continue
+    const title = row.displayTitle ?? (row as { title?: string }).title
+    if (typeof title === 'string' && title.length >= 2 && rowText.includes(title)) {
+      return id
+    }
+  }
+
+  // 3. 时序顺序认领
+  for (const { id } of candidates) {
+    if (!claimed.has(id)) return id
+  }
+
+  return undefined
 }
 
 export function displayTitleOf(node: DelegationNode, index: number): string {
@@ -351,18 +398,40 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
   const sync = () => {
     frame = 0
     const parentId = options.currentSessionId()
-    const rows = options.sessions.getSnapshot().byId
+    const snapshot = options.sessions.getSnapshot() as {
+      byId?: SessionRows
+      projectionsBySession?: Record<string, { values?: { subagentCatalog?: Array<{ id: string; label?: string }> } }>
+    }
+    const rows = snapshot.byId ?? (snapshot as unknown as SessionRows)
     const now = Date.now()
     const live = new Set<Element>()
     const pending: Array<{ anchor: Element; members: BatchMember[] }> = []
     let running = false
     let rowCount = 0
 
+    // 计算当前父会话的子代理有序列表（优先用目录时序）
+    const catalogEntries = snapshot.projectionsBySession?.[parentId ?? '']?.values?.subagentCatalog
+      ?? (parentId ? snapshot.projectionsBySession?.[parentId.replace(/^session-/, '')]?.values?.subagentCatalog : undefined)
+    const catalogIds = (catalogEntries ?? []).map((e) => e.id)
+    const matchesParent = (p: string | undefined) =>
+      parentId === undefined || p === parentId || (p !== undefined && p.replace(/^session-/, '') === parentId.replace(/^session-/, ''))
+    const otherIds = Object.keys(rows).filter((id) => {
+      const r = rows[id]
+      if (r === undefined || r.origin !== 'subagent') return false
+      if (!matchesParent(r.parentId)) return false
+      return !catalogIds.includes(id)
+    })
+    const candidateIds = [...catalogIds, ...otherIds]
+    const claimed = new Set<string>()
+
     for (const turn of document.querySelectorAll(TURN)) {
       // 按聊天节点顺序切批：连续委派算一批，中间出现别的工具调用就断开。
       const groups: Array<{ anchor: Element; rows: HTMLElement[] }> = []
       let current: { anchor: Element; rows: HTMLElement[] } | null = null
-      for (const node of turn.querySelectorAll<HTMLElement>(NODE_KEY)) {
+      const nodes = turn.matches(NODE_KEY)
+        ? [turn as HTMLElement]
+        : [...turn.querySelectorAll<HTMLElement>(NODE_KEY)]
+      for (const node of nodes) {
         const own = [...node.querySelectorAll<HTMLElement>(TOOL_ROW)].filter((row) => isDelegationTool(row.getAttribute('data-tool')))
         const other = node.querySelectorAll(TOOL_ROW).length > own.length
         if (own.length === 0) {
@@ -383,8 +452,9 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
         const seen = new Set<string>()
         for (const row of group.rows) {
           rowCount += 1
-          // 无法确认子会话时保留原生工具行，不按会话顺序猜测，以免跳转或停止错误的代理。
-          const ids = pickSubagentIds(row.textContent ?? '', rows, parentId)
+          const matchedId = matchSubagentId(row.textContent ?? '', rows, parentId, claimed, candidateIds)
+          const ids = matchedId !== undefined ? [matchedId] : []
+          if (matchedId !== undefined) claimed.add(matchedId)
           const rawState = row.getAttribute('data-state')
           const abnormal: Abnormal = rawState === 'error' ? 'failed' : rawState === 'denied' ? 'denied' : null
           const nodes = delegationNodesFor(ids, abnormal, rows, now)
