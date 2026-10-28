@@ -5,6 +5,7 @@ import {
   calculateContextCapacity,
   formatCompactTokens,
   deriveComposerStats,
+  extractTokenUsage,
   type SessionStatsProjection,
   type TokenUsageProjection,
   type ContextPressureProjection
@@ -67,6 +68,47 @@ describe('calculateCacheRate', () => {
   })
 })
 
+describe('extractTokenUsage (兼容平铺与嵌套投影)', () => {
+  it('解析 DSH 宿主 useProjection("tokenUsage") 返回的平铺结构', () => {
+    // 真实宿主返回的是扁平对象
+    const flatUsage = {
+      uncachedInputTokens: 15425147,
+      cacheReadTokens: 559962931,
+      cacheWriteTokens: 1482880,
+      outputTokens: 917801
+    }
+    const res = extractTokenUsage(flatUsage)
+    expect(res).toEqual({
+      uncachedInputTokens: 15425147,
+      cacheReadTokens: 559962931,
+      cacheWriteTokens: 1482880,
+      outputTokens: 917801,
+      totalTokens: 15425147 + 559962931 + 1482880 + 917801,
+      cacheRate: 97
+    })
+  })
+
+  it('解析磁盘持久化带 totals 的嵌套结构', () => {
+    const nestedUsage = {
+      totals: {
+        uncachedInputTokens: 2000,
+        cacheReadTokens: 8000,
+        cacheWriteTokens: 500,
+        outputTokens: 1000
+      }
+    }
+    const res = extractTokenUsage(nestedUsage)
+    expect(res).toEqual({
+      uncachedInputTokens: 2000,
+      cacheReadTokens: 8000,
+      cacheWriteTokens: 500,
+      outputTokens: 1000,
+      totalTokens: 11500,
+      cacheRate: 80
+    })
+  })
+})
+
 describe('calculateContextCapacity', () => {
   it('计算已用、上限与占用百分比和状态等级', () => {
     const pressure: ContextPressureProjection = {
@@ -79,28 +121,33 @@ describe('calculateContextCapacity', () => {
       contextWindow: 500000,
       remainingTokens: 378945,
       usedPercent: 24,
-      level: 'comfortable'
+      level: 'comfortable',
+      bucket: 'good'
     })
   })
 
-  it('超过 75% 预警，超过 90% 危险', () => {
-    expect(calculateContextCapacity({ pressureTokens: 380000, contextWindow: 500000 })?.level).toBe('warning')
-    expect(calculateContextCapacity({ pressureTokens: 460000, contextWindow: 500000 })?.level).toBe('critical')
+  it('超过 50% 提醒，超过 75% 警戒', () => {
+    expect(calculateContextCapacity({ pressureTokens: 300000, contextWindow: 500000 })?.bucket).toBe('warn')
+    expect(calculateContextCapacity({ pressureTokens: 400000, contextWindow: 500000 })?.bucket).toBe('bad')
   })
 })
 
 describe('deriveComposerStats', () => {
   it('汇总底部栏平铺所需数据', () => {
     const stats: SessionStatsProjection = {
+      turns: 3,
+      steps: 8,
       decodeTokens: 1000,
       llmMs: 20000,
       ttftMs: 15000,
-      decodeMs: 5000
+      decodeMs: 5000,
+      toolMs: 3000
     }
     const usage: TokenUsageProjection = {
       totals: {
         uncachedInputTokens: 2000,
         cacheReadTokens: 8000,
+        cacheWriteTokens: 500,
         outputTokens: 1000
       }
     }
@@ -111,6 +158,11 @@ describe('deriveComposerStats', () => {
 
     const res = deriveComposerStats(stats, usage, pressure, 4200)
     expect(res).toMatchObject({
+      activity: {
+        turns: 3,
+        steps: 8,
+        label: '3 轮 · 8 步'
+      },
       context: {
         label: '50k / 200k (25%)',
         level: 'comfortable'
@@ -127,6 +179,20 @@ describe('deriveComposerStats', () => {
       duration: {
         ms: 4200,
         label: '4.2 秒'
+      },
+      tokensDetail: {
+        uncachedInputTokens: 2000,
+        cacheReadTokens: 8000,
+        cacheWriteTokens: 500,
+        outputTokens: 1000,
+        totalTokens: 11500
+      },
+      timingDetail: {
+        llmMs: 20000,
+        toolMs: 3000,
+        totalMs: 23000,
+        ttftMs: 15000,
+        decodeMs: 5000
       }
     })
   })

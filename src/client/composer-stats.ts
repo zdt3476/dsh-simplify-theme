@@ -9,6 +9,8 @@
  * 平铺展示在底部栏，一眼纵览全局运行健康度。
  */
 
+import { classifyPercent, type PercentBucket } from './stat-colors'
+
 export interface SessionStatsProjection {
   turns?: number
   steps?: number
@@ -51,20 +53,30 @@ export interface ContextCapacity {
   remainingTokens: number
   usedPercent: number
   level: ContextLevel
+  bucket: PercentBucket
 }
 
 export interface ComposerStatsView {
+  activity: {
+    turns: number
+    steps: number
+    label: string
+  } | null
   context: {
     usedTokens: number
     contextWindow: number
+    remainingTokens: number
     usedPercent: number
     label: string
     level: ContextLevel
+    bucket: PercentBucket
     tooltip: string
   } | null
   tps: {
     value: number
     label: string
+    rawDecodeTps?: string
+    avgTtft?: string
     tooltip: string
   } | null
   cache: {
@@ -77,6 +89,20 @@ export interface ComposerStatsView {
     ms: number
     label: string
     tooltip: string
+  } | null
+  tokensDetail: {
+    uncachedInputTokens: number
+    cacheReadTokens: number
+    cacheWriteTokens: number
+    outputTokens: number
+    totalTokens: number
+  } | null
+  timingDetail: {
+    llmMs: number
+    toolMs: number
+    totalMs: number
+    ttftMs: number
+    decodeMs: number
   } | null
 }
 
@@ -135,10 +161,52 @@ export function calculateCacheRate(
   return Math.round((cacheReadTokens / totalInput) * 100)
 }
 
+export interface ExtractedTokenUsage {
+  uncachedInputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+  outputTokens: number
+  totalTokens: number
+  cacheRate: number | null
+}
+
+/** 规范化提取 tokenUsage（兼容平铺与嵌套两种格式） */
+export function extractTokenUsage(usage: unknown): ExtractedTokenUsage | null {
+  if (!usage || typeof usage !== 'object') return null
+  const obj = usage as Record<string, unknown>
+  const target = (obj.val && typeof obj.val === 'object')
+    ? (obj.val as Record<string, unknown>)
+    : obj
+
+  const source = (target.totals && typeof target.totals === 'object')
+    ? (target.totals as Record<string, unknown>)
+    : target
+
+  const uncached = typeof source.uncachedInputTokens === 'number' ? source.uncachedInputTokens : 0
+  const cacheRead = typeof source.cacheReadTokens === 'number' ? source.cacheReadTokens : 0
+  const cacheWrite = typeof source.cacheWriteTokens === 'number' ? source.cacheWriteTokens : 0
+  const output = typeof source.outputTokens === 'number' ? source.outputTokens : 0
+  const total = uncached + cacheRead + cacheWrite + output
+
+  if (total <= 0) return null
+
+  const promptTotal = uncached + cacheRead
+  const cacheRate = promptTotal > 0 ? Math.round((cacheRead / promptTotal) * 100) : null
+
+  return {
+    uncachedInputTokens: uncached,
+    cacheReadTokens: cacheRead,
+    cacheWriteTokens: cacheWrite,
+    outputTokens: output,
+    totalTokens: total,
+    cacheRate
+  }
+}
+
 /** 计算上下文占用、上限及预警等级 */
 export function calculateContextCapacity(
   pressure: ContextPressureProjection | undefined,
-  usage?: TokenUsageProjection
+  usage?: TokenUsageProjection | unknown
 ): ContextCapacity | null {
   const windowLimit = pressure?.contextWindow
   if (typeof windowLimit !== 'number' || !Number.isFinite(windowLimit) || windowLimit <= 0) {
@@ -146,10 +214,8 @@ export function calculateContextCapacity(
   }
 
   // 优先用 pressureTokens，备选用最新/累计输入输出总和
-  const used = pressure?.pressureTokens
-    ?? (usage?.totals
-      ? (usage.totals.uncachedInputTokens ?? 0) + (usage.totals.cacheReadTokens ?? 0) + (usage.totals.outputTokens ?? 0)
-      : undefined)
+  const extracted = extractTokenUsage(usage)
+  const used = pressure?.pressureTokens ?? extracted?.totalTokens
 
   if (typeof used !== 'number' || !Number.isFinite(used) || used <= 0) {
     return null
@@ -159,28 +225,30 @@ export function calculateContextCapacity(
   const usedPercent = Math.round(usedRatio * 100)
   const remainingTokens = Math.max(0, windowLimit - used)
 
-  const level: ContextLevel = usedPercent >= 90
-    ? 'critical'
-    : usedPercent >= 75
-      ? 'warning'
-      : 'comfortable'
+  const bucket: PercentBucket = classifyPercent('context', usedPercent)
+  const level: ContextLevel = bucket === 'bad' ? 'critical' : bucket === 'warn' ? 'warning' : 'comfortable'
 
   return {
     usedTokens: used,
     contextWindow: windowLimit,
     remainingTokens,
     usedPercent,
-    level
+    level,
+    bucket
   }
 }
 
 /** 格式化耗时展示 */
-function formatSimpleDuration(ms: number): string {
+export function formatSimpleDuration(ms: number): string {
   const s = ms / 1000
+  if (s < 1) return `${Math.max(1, Math.round(ms))} 毫秒`
   if (s < 60) return `${Math.round(s * 10) / 10} 秒`
   const minutes = Math.floor(s / 60)
   const rem = Math.round(s % 60)
-  return rem === 0 ? `${minutes} 分` : `${minutes} 分 ${rem} 秒`
+  if (minutes < 60) return rem === 0 ? `${minutes} 分` : `${minutes} 分 ${rem} 秒`
+  const hours = Math.floor(minutes / 60)
+  const remM = minutes % 60
+  return remM === 0 ? `${hours} 小时` : `${hours} 小时 ${remM} 分`
 }
 
 /** 从各投影推导平铺状态栏展示模型 */
@@ -190,7 +258,19 @@ export function deriveComposerStats(
   pressure?: ContextPressureProjection,
   latestDurationMs?: number
 ): ComposerStatsView {
-  // 1. 上下文容量
+  // 1. 会话活动（轮数 · 步数）
+  let activityView: ComposerStatsView['activity'] = null
+  if (stats && ((stats.turns ?? 0) > 0 || (stats.steps ?? 0) > 0)) {
+    const turns = stats.turns ?? 0
+    const steps = stats.steps ?? 0
+    activityView = {
+      turns,
+      steps,
+      label: `${turns} 轮 · ${steps} 步`
+    }
+  }
+
+  // 2. 上下文容量
   const capacity = calculateContextCapacity(pressure, usage)
   let contextView: ComposerStatsView['context'] = null
   if (capacity !== null) {
@@ -203,14 +283,16 @@ export function deriveComposerStats(
     contextView = {
       usedTokens: capacity.usedTokens,
       contextWindow: capacity.contextWindow,
+      remainingTokens: capacity.remainingTokens,
       usedPercent: capacity.usedPercent,
       label: `${compactUsed} / ${compactWindow} (${capacity.usedPercent}%)`,
       level: capacity.level,
+      bucket: capacity.bucket,
       tooltip: `上下文容量: 已用 ${capacity.usedTokens.toLocaleString()} / 上限 ${capacity.contextWindow.toLocaleString()} (剩余 ${capacity.remainingTokens.toLocaleString()} tokens)${lastInput || lastCache || lastOut ? `\n最新单轮: 输入 ${formatCompactTokens(lastInput)} · 缓存读 ${formatCompactTokens(lastCache)} · 输出 ${formatCompactTokens(lastOut)}` : ''}`
     }
   }
 
-  // 2. 真实 TPS（包含首字延迟）
+  // 3. 真实 TPS（包含首字延迟）
   const tpsVal = calculateRealTps(stats)
   let tpsView: ComposerStatsView['tps'] = null
   if (tpsVal !== null && stats) {
@@ -224,26 +306,37 @@ export function deriveComposerStats(
     tpsView = {
       value: tpsVal,
       label: `${tpsVal} t/s`,
+      rawDecodeTps: rawTps,
+      avgTtft,
       tooltip: `端到端生成速率（含首字延迟/思考等待）\n会话总产出: ${(stats.decodeTokens ?? 0).toLocaleString()} tokens\n平均首字延迟: ${avgTtft}\n纯流式吐字速率: ${rawTps}`
     }
   }
 
-  // 3. 缓存命中率
-  const inputTokens = usage?.totals?.uncachedInputTokens
-  const cacheReadTokens = usage?.totals?.cacheReadTokens
-  const cacheRate = calculateCacheRate(inputTokens, cacheReadTokens)
+  // 4. 缓存命中率与 Token 详细构成
+  const tokenUsageInfo = extractTokenUsage(usage)
   let cacheView: ComposerStatsView['cache'] = null
-  if (cacheRate !== null && inputTokens !== undefined && cacheReadTokens !== undefined) {
-    const bucket: CacheBucket = cacheRate >= 80 ? 'good' : cacheRate >= 50 ? 'warn' : 'bad'
-    cacheView = {
-      percent: cacheRate,
-      label: `缓存 ${cacheRate}%`,
-      bucket,
-      tooltip: `Prompt 缓存命中率: ${cacheRate}%\n累计缓存读取: ${cacheReadTokens.toLocaleString()} tokens\n累计未缓存输入: ${inputTokens.toLocaleString()} tokens`
+  let tokensDetail: ComposerStatsView['tokensDetail'] = null
+
+  if (tokenUsageInfo !== null) {
+    tokensDetail = {
+      uncachedInputTokens: tokenUsageInfo.uncachedInputTokens,
+      cacheReadTokens: tokenUsageInfo.cacheReadTokens,
+      cacheWriteTokens: tokenUsageInfo.cacheWriteTokens,
+      outputTokens: tokenUsageInfo.outputTokens,
+      totalTokens: tokenUsageInfo.totalTokens
+    }
+    if (tokenUsageInfo.cacheRate !== null) {
+      const bucket: CacheBucket = tokenUsageInfo.cacheRate >= 80 ? 'good' : tokenUsageInfo.cacheRate >= 50 ? 'warn' : 'bad'
+      cacheView = {
+        percent: tokenUsageInfo.cacheRate,
+        label: `缓存 ${tokenUsageInfo.cacheRate}%`,
+        bucket,
+        tooltip: `Prompt 缓存命中率: ${tokenUsageInfo.cacheRate}%\n累计缓存读取: ${tokenUsageInfo.cacheReadTokens.toLocaleString()} tokens\n累计未缓存输入: ${tokenUsageInfo.uncachedInputTokens.toLocaleString()} tokens`
+      }
     }
   }
 
-  // 4. 单轮耗时
+  // 5. 耗时展示（优先单轮最新耗时，若无则回退至模型累计耗时）
   let durationView: ComposerStatsView['duration'] = null
   if (typeof latestDurationMs === 'number' && latestDurationMs > 0) {
     durationView = {
@@ -251,12 +344,36 @@ export function deriveComposerStats(
       label: formatSimpleDuration(latestDurationMs),
       tooltip: `最新一轮总用时: ${formatSimpleDuration(latestDurationMs)}`
     }
+  } else if (stats && (stats.llmMs ?? 0) > 0) {
+    const totalLlm = stats.llmMs!
+    durationView = {
+      ms: totalLlm,
+      label: formatSimpleDuration(totalLlm),
+      tooltip: `模型累计总耗时: ${formatSimpleDuration(totalLlm)}${stats.turns ? ` (平均每轮 ${formatSimpleDuration(totalLlm / stats.turns)})` : ''}`
+    }
+  }
+
+  // 6. 详细耗时分解
+  let timingDetail: ComposerStatsView['timingDetail'] = null
+  if (stats && ((stats.llmMs ?? 0) > 0 || (stats.toolMs ?? 0) > 0)) {
+    const llm = stats.llmMs ?? 0
+    const tool = stats.toolMs ?? 0
+    timingDetail = {
+      llmMs: llm,
+      toolMs: tool,
+      totalMs: llm + tool,
+      ttftMs: stats.ttftMs ?? 0,
+      decodeMs: stats.decodeMs ?? 0
+    }
   }
 
   return {
+    activity: activityView,
     context: contextView,
     tps: tpsView,
     cache: cacheView,
-    duration: durationView
+    duration: durationView,
+    tokensDetail,
+    timingDetail
   }
 }

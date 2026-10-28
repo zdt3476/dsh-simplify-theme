@@ -23,7 +23,8 @@ export function placePopup(
   rect: AnchorRect,
   size: { width: number; height: number },
   viewport: { width: number; height: number },
-  align: 'center' | 'left' | 'right' = 'center'
+  align: 'center' | 'left' | 'right' = 'center',
+  preferredSide: 'top' | 'bottom' = 'bottom'
 ): Placement {
   let left: number
   if (align === 'center') left = (rect.left + rect.right) / 2 - size.width / 2
@@ -31,8 +32,16 @@ export function placePopup(
   else left = rect.left
   if (left + size.width > viewport.width - 8) left = viewport.width - 8 - size.width
   if (left < 8) left = 8
-  let top = rect.bottom + 4
-  if (top + size.height > viewport.height - 8) top = Math.max(8, rect.top - size.height - 4)
+
+  let top: number
+  if (preferredSide === 'top') {
+    top = rect.top - size.height - 6
+    if (top < 8) top = Math.min(viewport.height - 8 - size.height, rect.bottom + 6)
+  } else {
+    top = rect.bottom + 4
+    if (top + size.height > viewport.height - 8) top = Math.max(8, rect.top - size.height - 4)
+  }
+
   return { left: Math.round(left), top: Math.round(top) }
 }
 
