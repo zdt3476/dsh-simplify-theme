@@ -6,12 +6,12 @@
 收紧圆角、气泡与交互态中性化。交互增强部分全部在浏览器侧完成，不新增 Host 行为，
 禁用插件即完全还原。
 
-- 版本：0.3.2
+- 版本：0.3.3
 - 环境：DSH ≥ 0.2.0；运行时需要 `react` / `react-dom`（由宿主 ModuleLoader 提供）
 
 ## 当前界面
 
-以下截图于 2026-10-24 重新拍摄。侧栏、权限和设置来自启用当前插件的隔离 DSH 预览；
+侧栏、权限和设置截图来自启用插件的隔离 DSH 预览；
 模型、思考等级及委派图通过当前源码组件在浏览器中渲染，使用演示目录与状态，图内已注明。
 截图采用浅色主题，不代表深色主题的验收结果。
 
@@ -25,9 +25,9 @@
 
 ![当前输入框下方控件与权限面板](docs/images/current-permission.png)
 
-委派图的 1 / 2 / 3 / 4 个子代理布局，包含完成、运行与失败状态（演示数据）：
+工作步骤折叠后仍可看到按批次分开的委派摘要；下图展示展开和收起两种状态（演示数据）：
 
-![当前子代理委派图：四种节点数量](docs/images/current-delegation.png)
+![子代理委派摘要与展开状态](docs/images/current-delegation.png)
 
 设置面板展示当前主题的圆角、描边与中性交互态：
 
@@ -46,7 +46,7 @@ dsh plugin --profile desktop add git+https://github.com/zdt3476/dsh-simplify-the
 dsh plugin --profile desktop add link:"$PWD"
 
 # Release 里的预构建包
-dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/releases/download/v0.3.2/dsh-simplify-theme-0.3.2.tgz
+dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/releases/download/v0.3.3/dsh-simplify-theme-0.3.3.tgz
 ```
 
 把 `desktop` 换成你实际使用的 profile（`dsh web` 默认是 `web`）。**首次安装后需要重启 DSH**；
@@ -133,18 +133,19 @@ dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/r
 
 ### 子代理委派图
 
-每一批委派在它发生的位置画一张单层图（结构参考 PI-Desktop 的 `SubagentTopology`）：
-左侧「主 Agent」卡片 → 连接线 → 右侧子代理节点。
+委派摘要放在相应工作步骤折叠区之外，即使收起步骤也可见。每批默认显示一行状态摘要，点击展开单层图
+（结构参考 PI-Desktop 的 `SubagentTopology`）：左侧「主 Agent」卡片 → 连接线 → 右侧子代理节点。
+同一折叠区内的多批摘要按顺序排列在该区之后，不一定保留每次调用的精确原始位置。
 
 - 分组：同一回合内连续出现的委派算一批；中间夹了别的工具调用就另起一张
 - 节点：状态角标、名称（单行省略，完整名在提示里）、模型、思考等级、状态·耗时、步数；
   失败节点红字显示错误原因（取自工具行的错误输出）；运行中节点带旋转指示与「停止」
 - 状态：已完成 / 运行中 / 失败 / 已拒绝；点击节点进入对应子会话
 - 连线：按真实几何绘制（SVG），主干覆盖首末分支，主 Agent 横线固定在主干正中
-- 原生 `subagent` 工具行被卡片取代（`display: none`，插件禁用即恢复），同一件事不再出现两次
-- 数据：会话列表快照（`origin: 'subagent'` + `parentId` + `projectionValues`）；工具行里拿不到
-  子会话 id 时按快照顺序兜底认领；节点缺统计时主动调一次
-  `sessions.refreshProjections(父会话)` 补齐
+- 只有能明确关联子会话的原生 `subagent` 工具行才被卡片取代（`display: none`，插件禁用即恢复）；
+  无法识别会话 ID 时保留原工具行，不猜测关联
+- 数据：会话列表快照（`origin: 'subagent'` + `parentId` + `projectionValues`），并从工具行文本中
+  匹配子会话 UUID；节点缺统计时主动调一次 `sessions.refreshProjections(父会话)` 补齐
 
 ### 文案本地化
 
@@ -195,8 +196,8 @@ high…）与内置供应商名也做了中文映射。
   DSH 大版本更新可能需要跟进
 - 委派图只画一层父子关系，不显示子代理再委派的后代；状态只区分宿主暴露的
   运行中/已完成/失败/已拒绝，`timed_out`、`aborted` 等终止态在会话行里没有稳定字段，未做推断
-- 委派图依赖会话列表快照：从未打开过、且投影尚未拉取的子代理可能只显示标题与状态，
-  统计会在补齐后出现；`mode: 'external'` 的子代理不会出现在快照里
+- 委派图依赖工具行中可识别的子会话 UUID 和会话列表快照；拿不到 ID 或匹配不到快照时，
+  只保留原生工具行，无法显示摘要。投影不完整时统计可能缺失；`mode: 'external'` 的子代理不会出现在快照里
 - 回合耗时是运行状态的墙钟观察值，包含排队与流式等待，口径可能和原生折叠行略有差异
 - 统计着色只作用于「缓存命中」标签与上下文环的百分比，其它数字不动
 - dock 弹层是自绘而非 MenuSurface，键盘导航由 Escape / 外点关闭兜底
@@ -205,7 +206,7 @@ high…）与内置供应商名也做了中文映射。
 
 ```sh
 pnpm install
-pnpm test        # 类型检查 + vitest（当前 59 项）
+pnpm test        # 类型检查 + vitest
 pnpm build       # 产出 lib/index.js（Host）与 lib/client.js（Client）
 pnpm check       # test + build
 ```
@@ -228,7 +229,7 @@ pnpm check       # test + build
 key 必须是 `--dsw-*`，值必须是 `{ light, dark }`，优先引用语义 alias 而不是复制色值。
 
 调试委派图：控制台执行 `localStorage.setItem('dsh-simplify-theme.debug','1')` 后刷新，
-每次扫描会打印「工具行 N 条，兜底 M 条，会话 <id>」。
+每次扫描会打印「工具行 N 条，已匹配 M 条，会话 <id>」。
 
 ## License
 

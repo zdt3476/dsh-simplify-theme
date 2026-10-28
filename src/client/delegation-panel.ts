@@ -72,6 +72,28 @@ export interface BatchMember {
   reason?: string
 }
 
+export interface BatchCounts {
+  total: number
+  done: number
+  running: number
+  failed: number
+  denied: number
+}
+
+export function batchCounts(members: readonly BatchMember[]): BatchCounts {
+  let done = 0
+  let running = 0
+  let failed = 0
+  let denied = 0
+  for (const { node } of members) {
+    if (node.status === 'running') running += 1
+    else if (node.status === 'done') done += 1
+    else if (node.status === 'failed') failed += 1
+    else denied += 1
+  }
+  return { total: members.length, done, running, failed, denied }
+}
+
 export interface DelegationPanelOptions {
   sessions: {
     getSnapshot: () => { byId: SessionRows }
@@ -92,6 +114,11 @@ export interface DelegationPanelHandle {
 const SVG_NS = 'http://www.w3.org/2000/svg'
 /** 主干左侧预留的间距（与参考实现的 34px 连接列一致）。 */
 const GAP = 34
+const STEP_PROCESS = '[data-step-process]'
+/** 宿主使用相同的 data-chat-turn 值标记同一回合的多个兄弟节点。 */
+function turnKeyOf(anchor: Element): string | Element {
+  return anchor.closest(TURN)?.getAttribute('data-chat-turn') ?? anchor.closest(STEP_PROCESS) ?? anchor
+}
 
 /**
  * 按真实几何画连线：主干 + 每个节点的分支 + 主 Agent 的横线。
@@ -157,9 +184,10 @@ const ICON_BOT = ['M4 5.5h8a1.5 1.5 0 011.5 1.5v4A1.5 1.5 0 0112 12.5H4A1.5 1.5 
 export function mountDelegationPanel(options: DelegationPanelOptions): DelegationPanelHandle | null {
   if (typeof document === 'undefined') return null
 
-  const hosts = new WeakMap<Element, HTMLElement>()
+  const hosts = new Map<Element, HTMLElement>()
   const refreshed = new Set<string>()
-  const painters = new Set<() => void>()
+  const expandedBatches = new WeakSet<HTMLElement>()
+  const painters = new Map<HTMLElement, () => void>()
   let ticker: number | undefined
   let frame = 0
   let debug = false
@@ -236,9 +264,39 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     return row
   }
 
-  const batchView = (members: BatchMember[]): HTMLElement => {
+  const batchView = (members: BatchMember[], index: number, host: HTMLElement): HTMLElement => {
     const section = el('section', 'subagent-topology')
-    section.setAttribute('aria-label', options.locale('delegation.agent'))
+    section.setAttribute('aria-label', options.locale('delegation.title'))
+    const counts = batchCounts(members)
+
+    // 默认只留一行摘要：折叠时仍能看到「这次回复委派了几批、结果如何」。
+    const summary = el('button', 'subagent-topology-summary')
+    summary.type = 'button'
+    const summaryIcon = el('span', 'subagent-topology-summary-icon')
+    summaryIcon.setAttribute('aria-hidden', 'true')
+    summaryIcon.append(icon(ICON_TARGET, 13))
+    const summaryLabel = head(options.locale('delegation.batch', { index }), 'subagent-topology-summary-label')
+    const summaryCounts = el('span', 'subagent-topology-summary-counts')
+    const parts = [options.locale('delegation.agents', { count: counts.total })]
+    if (counts.done > 0) parts.push(`${counts.done} ${options.locale('delegation.state.done')}`)
+    if (counts.running > 0) parts.push(`${counts.running} ${options.locale('delegation.state.running')}`)
+    summaryCounts.textContent = parts.join(' · ')
+    if (counts.failed > 0) {
+      const alert = el('span', 'subagent-topology-summary-alert')
+      alert.textContent = ` · ${counts.failed} ${options.locale('delegation.state.failed')}`
+      summaryCounts.append(alert)
+    }
+    if (counts.denied > 0) {
+      const denied = el('span', 'subagent-topology-summary-alert')
+      denied.textContent = ` · ${counts.denied} ${options.locale('delegation.state.denied')}`
+      summaryCounts.append(denied)
+    }
+    const chevron = el('span', 'subagent-topology-summary-chevron')
+    chevron.setAttribute('aria-hidden', 'true')
+    chevron.append(icon(['M4.5 6.5L8 10l3.5-3.5'], 13))
+    summary.append(summaryIcon, summaryLabel, summaryCounts, chevron)
+
+    const detail = el('div', 'subagent-topology-detail')
     const root = el('div', 'subagent-topology-root')
     const rootIcon = el('span', 'subagent-topology-root-icon')
     rootIcon.setAttribute('aria-hidden', 'true')
@@ -246,15 +304,15 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     const copy = el('span', 'subagent-topology-root-copy')
     copy.append(head(options.locale('delegation.agent'), ''))
     copy.firstElementChild!.setAttribute('data-dsh-simplify-root-title', '')
-    const detail = el('span')
-    detail.textContent = options.locale('delegation.coordinating', { count: members.length })
-    copy.append(detail)
+    const detailText = el('span')
+    detailText.textContent = options.locale('delegation.coordinating', { count: members.length })
+    copy.append(detailText)
     root.append(rootIcon, copy)
     const connector = el('span', 'subagent-topology-connector')
     connector.setAttribute('aria-hidden', 'true')
     const agents = el('div', 'subagent-topology-agents')
     agents.setAttribute('role', 'list')
-    members.forEach((member, index) => agents.append(nodeView(member, index)))
+    members.forEach((member, memberIndex) => agents.append(nodeView(member, memberIndex)))
     const svg = document.createElementNS(SVG_NS, 'svg')
     svg.setAttribute('data-dsh-simplify-lines', '')
     svg.setAttribute('aria-hidden', 'true')
@@ -263,11 +321,30 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     path.setAttribute('fill', 'none')
     svg.append(path)
     agents.append(svg)
-    section.append(root, connector, agents)
-    // 连线全部由 paintConnectors 按真实几何绘制，节点高矮不一也不会错位。
-    const repaint = () => paintConnectors(agents, svg)
-    painters.add(repaint)
-    window.requestAnimationFrame(repaint)
+    detail.append(root, connector, agents)
+
+    // 连线全部由 paintConnectors 按真实几何绘制；展开后才可测量，隐藏时跳过。
+    const repaint = () => {
+      if (detail.offsetParent === null) return
+      paintConnectors(agents, svg)
+    }
+    painters.set(host, repaint)
+
+    const apply = (open: boolean) => {
+      section.classList.toggle('is-collapsed', !open)
+      summary.setAttribute('aria-expanded', String(open))
+      summary.title = options.locale(open ? 'delegation.collapse' : 'delegation.expand')
+      if (open) window.requestAnimationFrame(repaint)
+    }
+    apply(expandedBatches.has(host))
+    summary.addEventListener('click', () => {
+      const open = section.classList.contains('is-collapsed')
+      if (open) expandedBatches.add(host)
+      else expandedBatches.delete(host)
+      apply(open)
+    })
+
+    section.append(summary, detail)
     return section
   }
 
@@ -277,15 +354,14 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     const rows = options.sessions.getSnapshot().byId
     const now = Date.now()
     const live = new Set<Element>()
+    const pending: Array<{ anchor: Element; members: BatchMember[] }> = []
     let running = false
     let rowCount = 0
-    let fallbacks = 0
 
     for (const turn of document.querySelectorAll(TURN)) {
       // 按聊天节点顺序切批：连续委派算一批，中间出现别的工具调用就断开。
       const groups: Array<{ anchor: Element; rows: HTMLElement[] }> = []
       let current: { anchor: Element; rows: HTMLElement[] } | null = null
-      const claimed = new Set<string>()
       for (const node of turn.querySelectorAll<HTMLElement>(NODE_KEY)) {
         const own = [...node.querySelectorAll<HTMLElement>(TOOL_ROW)].filter((row) => isDelegationTool(row.getAttribute('data-tool')))
         const other = node.querySelectorAll(TOOL_ROW).length > own.length
@@ -298,7 +374,6 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
         }
         current ??= { anchor: node, rows: [] }
         current.rows.push(...own)
-        current.anchor = node
       }
       if (current !== null) groups.push(current)
 
@@ -308,19 +383,12 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
         const seen = new Set<string>()
         for (const row of group.rows) {
           rowCount += 1
-          let ids = pickSubagentIds(row.textContent ?? '', rows, parentId)
-          if (ids.length === 0) {
-            const orphan = Object.entries(rows).find(([id, candidate]) => candidate !== undefined && candidate.origin === 'subagent' && candidate.parentId === parentId && !claimed.has(id))?.[0]
-            if (orphan !== undefined) {
-              ids = [orphan]
-              fallbacks += 1
-            }
-          }
-          for (const id of ids) claimed.add(id)
+          // 无法确认子会话时保留原生工具行，不按会话顺序猜测，以免跳转或停止错误的代理。
+          const ids = pickSubagentIds(row.textContent ?? '', rows, parentId)
           const rawState = row.getAttribute('data-state')
           const abnormal: Abnormal = rawState === 'error' ? 'failed' : rawState === 'denied' ? 'denied' : null
           const nodes = delegationNodesFor(ids, abnormal, rows, now)
-          // 同一次扇出里同一个子代理只能出现一次（兜底认领可能重复命中）。
+          // 同一次扇出里同一个子代理只展示一次。
           if (nodes.length === 0 || seen.has(nodes[0].id)) continue
           seen.add(nodes[0].id)
           members.push({ node: nodes[0], ...(abnormal === null ? {} : { reason: errorReasonOf(row) }) })
@@ -332,29 +400,54 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
           row.setAttribute(SOURCE_ATTR, '')
           live.add(row)
         }
-        const anchor = group.anchor
-        const parent = anchor.parentElement
-        if (parent === null) continue
-        let host = hosts.get(anchor)
-        if (host === undefined) {
-          host = el('div', 'subagent-topology-host')
-          hosts.set(anchor, host)
-        }
-        if (host.parentElement !== parent || host.previousElementSibling !== anchor) {
-          parent.insertBefore(host, anchor.nextSibling)
-        }
-        const signature = JSON.stringify(members.map(({ node, reason }) => [node.id, node.status, node.model ?? '', node.steps ?? -1, Math.round((node.durationMs ?? 0) / 1000), reason ?? '']))
-        if (host.dataset.signature !== signature) {
-          host.dataset.signature = signature
-          host.replaceChildren(batchView(members))
-        }
+        pending.push({ anchor: group.anchor, members })
       }
+    }
+
+    // 批次按文档顺序编号，避免嵌套 data-chat-turn 造成的重复挂载。
+    pending.sort((a, b) => (a.anchor.compareDocumentPosition(b.anchor) & 4) !== 0 ? -1 : 1)
+    const placed = new Set<Element>()
+    const indexByTurn = new Map<string | Element, number>()
+    // 同一折叠组里的多批委派共用一个挂载点，记录上一张图以保持批次顺序。
+    const tailOf = new Map<Element, HTMLElement>()
+    for (const { anchor, members } of pending) {
+      if (placed.has(anchor)) continue
+      placed.add(anchor)
+      const turn = turnKeyOf(anchor)
+      const index = (indexByTurn.get(turn) ?? 0) + 1
+      indexByTurn.set(turn, index)
+      // 挂在工作步骤折叠区之外的同一层，折叠工具细节时摘要仍可见。
+      const holder = anchor.closest(STEP_PROCESS) ?? anchor
+      const parent = holder.parentElement
+      if (parent === null) continue
+      let host = hosts.get(anchor)
+      if (host === undefined) {
+        host = el('div', 'subagent-topology-host')
+        hosts.set(anchor, host)
+      }
+      const previous = tailOf.get(holder) ?? holder
+      if (host.parentElement !== parent || host.previousElementSibling !== previous) {
+        parent.insertBefore(host, previous.nextSibling)
+      }
+      tailOf.set(holder, host)
+      const signature = JSON.stringify([index, members.map(({ node, reason }) => [{ ...node, durationMs: Math.round((node.durationMs ?? 0) / 1000) }, reason])])
+      if (host.dataset.signature !== signature) {
+        host.dataset.signature = signature
+        host.replaceChildren(batchView(members, index, host))
+      }
+    }
+
+    for (const [anchor, host] of hosts) {
+      if (placed.has(anchor)) continue
+      host.remove()
+      painters.delete(host)
+      hosts.delete(anchor)
     }
 
     for (const row of document.querySelectorAll(`[${SOURCE_ATTR}]`)) {
       if (!live.has(row)) row.removeAttribute(SOURCE_ATTR)
     }
-    if (debug) console.info(`[dsh-simplify-theme] 委派图: 工具行 ${rowCount} 条, 兜底 ${fallbacks} 条, 会话 ${parentId ?? '未知'}`)
+    if (debug) console.info(`[dsh-simplify-theme] 委派图: 工具行 ${rowCount} 条, 已匹配 ${live.size} 条, 会话 ${parentId ?? '未知'}`)
 
     if (running && ticker === undefined) ticker = window.setInterval(schedule, 1000)
     else if (!running && ticker !== undefined) {
@@ -385,7 +478,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
   }
 
   const repaintAll = () => {
-    for (const paint of painters) {
+    for (const paint of painters.values()) {
       try {
         paint()
       } catch {

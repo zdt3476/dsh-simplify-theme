@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { delegationDuration, selectionEffort, selectionModel, toDelegationNode } from '../../src/client/delegation-tree'
-import { delegationNodesFor, errorReasonOf, formatDelegationDuration, isDelegationTool, pickSubagentIds } from '../../src/client/delegation-panel'
+import { delegationNodesFor, errorReasonOf, formatDelegationDuration, isDelegationTool, pickSubagentIds, batchCounts, type BatchMember } from '../../src/client/delegation-panel'
 
 const rows = {
   child1: {
@@ -103,6 +103,21 @@ describe('per-delegation matching', () => {
     expect(delegationNodesFor(['a'], 'denied', store, 0).map(node => node.status)).toEqual(['denied'])
     expect(delegationNodesFor([], null, store, 0)).toEqual([])
     expect(delegationNodesFor(['missing'], null, store, 0)).toEqual([])
+  })
+})
+
+describe('batch summary counts', () => {
+  const member = (status: 'running' | 'done' | 'failed' | 'denied'): BatchMember =>
+    ({ node: { id: status, title: status, status } })
+
+  it('按状态汇总一批委派', () => {
+    expect(batchCounts([])).toEqual({ total: 0, done: 0, running: 0, failed: 0, denied: 0 })
+    expect(batchCounts([member('done'), member('done')])).toEqual({ total: 2, done: 2, running: 0, failed: 0, denied: 0 })
+  })
+
+  it('运行中、失败与拒绝分别计数', () => {
+    expect(batchCounts([member('running'), member('failed'), member('denied')]))
+      .toEqual({ total: 3, done: 0, running: 1, failed: 1, denied: 1 })
   })
 })
 

@@ -512,19 +512,88 @@ export const UI_CSS = `
 
 .subagent-topology-host {
   display: block;
-  margin: 10px 0;
+  margin: 8px 0;
 }
 
 .subagent-topology {
-  display: grid;
+  display: flex;
   box-sizing: border-box;
   min-width: 0;
   max-width: 640px;
   margin: 0 auto;
+  flex-direction: column;
+  padding: 2px 0;
+}
+
+/* 摘要行常驻：它挂在折叠区之外，宿主收起工作步骤后仍然可见。 */
+.subagent-topology-summary {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.subagent-topology-summary:hover { background: var(--dsw-alias-interactive-bg-hover); }
+
+.subagent-topology-summary:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+.subagent-topology-summary-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.subagent-topology-summary-label {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.subagent-topology-summary-counts {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-topology-summary-alert { color: var(--dsw-alias-state-error-primary); }
+
+.subagent-topology-summary-chevron {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary);
+  transition: transform 120ms ease;
+}
+
+.subagent-topology-summary[aria-expanded='true'] .subagent-topology-summary-chevron { transform: rotate(180deg); }
+
+.subagent-topology-detail {
+  display: grid;
+  box-sizing: border-box;
+  min-width: 0;
   grid-template-columns: minmax(138px, 0.58fr) 34px minmax(248px, 1.42fr);
   align-items: center;
-  padding: 8px 0;
+  padding: 6px 0 2px;
 }
+
+.subagent-topology.is-collapsed .subagent-topology-detail { display: none; }
 
 .subagent-topology-root {
   display: flex;
