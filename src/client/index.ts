@@ -426,7 +426,7 @@ function registerDock(ctx: ClientCtx): void {
       if (ref.current === null || ref.current.sessionId !== sessionId) {
         ref.current = { sessionId, control: createDockControl({ sessionId, directories, remote, useProjection, session, shared, usage, recordSelection: recordLocalUsage }) }
       }
-      return h(ref.current.control as never, {})
+      return h(ref.current.control as never, { useProjection })
     }
   ))
 }

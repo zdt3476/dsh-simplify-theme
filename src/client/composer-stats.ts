@@ -41,7 +41,15 @@ export interface TokenUsageProjection {
 export interface ContextPressureProjection {
   contextWindow?: number
   pressureTokens?: number
+  projectedTokens?: number
   surfaceTokens?: number
+  sampledSurfaceTokens?: number
+}
+
+export interface ContextBreakdownProjection {
+  systemTokens?: number
+  toolsTokens?: number
+  messageTokens?: number
 }
 
 export type ContextLevel = 'comfortable' | 'warning' | 'critical'
@@ -54,6 +62,12 @@ export interface ContextCapacity {
   usedPercent: number
   level: ContextLevel
   bucket: PercentBucket
+  breakdown?: {
+    systemTokens: number
+    toolsTokens: number
+    messageTokens: number
+    totalTokens: number
+  }
 }
 
 export interface ComposerStatsView {
@@ -71,6 +85,12 @@ export interface ComposerStatsView {
     level: ContextLevel
     bucket: PercentBucket
     tooltip: string
+    breakdown?: {
+      systemTokens: number
+      toolsTokens: number
+      messageTokens: number
+      totalTokens: number
+    }
   } | null
   tps: {
     value: number
@@ -206,16 +226,24 @@ export function extractTokenUsage(usage: unknown): ExtractedTokenUsage | null {
 /** 计算上下文占用、上限及预警等级 */
 export function calculateContextCapacity(
   pressure: ContextPressureProjection | undefined,
-  usage?: TokenUsageProjection | unknown
+  usage?: TokenUsageProjection | unknown,
+  breakdown?: ContextBreakdownProjection
 ): ContextCapacity | null {
   const windowLimit = pressure?.contextWindow
   if (typeof windowLimit !== 'number' || !Number.isFinite(windowLimit) || windowLimit <= 0) {
     return null
   }
 
-  // 优先用 pressureTokens，备选用最新/累计输入输出总和
+  // projectedTokens 实时反映上下文压缩与裁剪后的真实尺寸；pressureTokens 为上一次 LLM 请求采样时的尺寸
   const extracted = extractTokenUsage(usage)
-  const used = pressure?.pressureTokens ?? extracted?.totalTokens
+  const breakdownSum = breakdown
+    ? ((breakdown.systemTokens ?? 0) + (breakdown.toolsTokens ?? 0) + (breakdown.messageTokens ?? 0))
+    : 0
+
+  const used = pressure?.projectedTokens
+    ?? pressure?.pressureTokens
+    ?? (breakdownSum > 0 ? breakdownSum : undefined)
+    ?? extracted?.totalTokens
 
   if (typeof used !== 'number' || !Number.isFinite(used) || used <= 0) {
     return null
@@ -228,13 +256,23 @@ export function calculateContextCapacity(
   const bucket: PercentBucket = classifyPercent('context', usedPercent)
   const level: ContextLevel = bucket === 'bad' ? 'critical' : bucket === 'warn' ? 'warning' : 'comfortable'
 
+  const breakdownDetail = breakdown && (breakdown.systemTokens !== undefined || breakdown.toolsTokens !== undefined || breakdown.messageTokens !== undefined)
+    ? {
+        systemTokens: breakdown.systemTokens ?? 0,
+        toolsTokens: breakdown.toolsTokens ?? 0,
+        messageTokens: breakdown.messageTokens ?? 0,
+        totalTokens: (breakdown.systemTokens ?? 0) + (breakdown.toolsTokens ?? 0) + (breakdown.messageTokens ?? 0)
+      }
+    : undefined
+
   return {
     usedTokens: used,
     contextWindow: windowLimit,
     remainingTokens,
     usedPercent,
     level,
-    bucket
+    bucket,
+    breakdown: breakdownDetail
   }
 }
 
@@ -256,7 +294,8 @@ export function deriveComposerStats(
   stats?: SessionStatsProjection,
   usage?: TokenUsageProjection,
   pressure?: ContextPressureProjection,
-  latestDurationMs?: number
+  latestDurationMs?: number,
+  breakdown?: ContextBreakdownProjection
 ): ComposerStatsView {
   // 1. 会话活动（轮数 · 步数）
   let activityView: ComposerStatsView['activity'] = null
@@ -271,7 +310,7 @@ export function deriveComposerStats(
   }
 
   // 2. 上下文容量
-  const capacity = calculateContextCapacity(pressure, usage)
+  const capacity = calculateContextCapacity(pressure, usage, breakdown)
   let contextView: ComposerStatsView['context'] = null
   if (capacity !== null) {
     const compactUsed = formatCompactTokens(capacity.usedTokens)
@@ -288,7 +327,8 @@ export function deriveComposerStats(
       label: `${compactUsed} / ${compactWindow} (${capacity.usedPercent}%)`,
       level: capacity.level,
       bucket: capacity.bucket,
-      tooltip: `上下文容量: 已用 ${capacity.usedTokens.toLocaleString()} / 上限 ${capacity.contextWindow.toLocaleString()} (剩余 ${capacity.remainingTokens.toLocaleString()} tokens)${lastInput || lastCache || lastOut ? `\n最新单轮: 输入 ${formatCompactTokens(lastInput)} · 缓存读 ${formatCompactTokens(lastCache)} · 输出 ${formatCompactTokens(lastOut)}` : ''}`
+      tooltip: `上下文容量: 已用 ${capacity.usedTokens.toLocaleString()} / 上限 ${capacity.contextWindow.toLocaleString()} (剩余 ${capacity.remainingTokens.toLocaleString()} tokens)${lastInput || lastCache || lastOut ? `\n最新单轮: 输入 ${formatCompactTokens(lastInput)} · 缓存读 ${formatCompactTokens(lastCache)} · 输出 ${formatCompactTokens(lastOut)}` : ''}`,
+      breakdown: capacity.breakdown
     }
   }
 

@@ -347,3 +347,104 @@ test('真实会话复杂投影数据（高轮数、大上下文、平铺 tokenUs
   assert.match(footerText, /模型总耗时 14 小时 56 分/)
   assert.match(footerText, /工具耗时 1 小时 32 分/)
 })
+
+test('执行上下文压缩后，通过 projectedTokens 立即刷新平铺栏和看板数据', async (t) => {
+  const page = await browser.newPage()
+  t.after(() => page.close())
+  await page.goto(`${origin}/fixture`)
+
+  await page.evaluate(async () => {
+    await import('/tests/client/dock-stats-fixture.mjs')
+    const { React, ReactDOM, UI_CSS, createDockStats } = window.testFixture
+
+    const style = document.createElement('style')
+    style.textContent = `
+      :root {
+        --dsw-alias-bg-base: #fff;
+        --dsw-alias-bg-layer-2: #fff;
+        --dsw-alias-border-l1: rgba(0, 0, 0, 0.08);
+        --dsw-alias-border-l2: rgba(0, 0, 0, 0.12);
+        --dsw-alias-label-primary: #0f1115;
+        --dsw-alias-label-secondary: #4b5563;
+        --dsw-alias-label-tertiary: #6b7280;
+        --dsw-alias-state-error-primary: #dc2626;
+        --dsw-alias-state-success-primary: #16a34a;
+        --dsw-alias-state-business-primary: #2563eb;
+        --dsw-alias-interactive-bg-hover: rgba(0, 0, 0, 0.05);
+        --dsw-radius-md: 8px;
+        --dsw-radius-lg: 12px;
+      }
+      body { margin: 0; background: #f9fafb; height: 100vh; }
+      #mount { position: fixed; bottom: 24px; left: calc(50% - 380px); width: 760px; }
+      ${UI_CSS}
+    `
+    document.head.append(style)
+
+    const mount = document.getElementById('mount')
+    mount.innerHTML = `
+      <div data-composer-seat>
+        <div data-composer-dock>
+          <div data-dsh-simplify-dock>
+            <div data-dsh-simplify-dock-left><button id="btn-model">DeepSeek-V3</button></div>
+            <div id="stats-mount"></div>
+            <div data-dsh-simplify-dock-right><button id="btn-perm">只读</button></div>
+          </div>
+        </div>
+      </div>
+    `
+
+    window.mockProjections = {
+      sessionStats: { turns: 5, steps: 40, decodeTokens: 4000, llmMs: 100000 },
+      tokenUsage: { totals: { uncachedInputTokens: 20000, cacheReadTokens: 100000, outputTokens: 4000 } },
+      contextPressure: { pressureTokens: 121055, contextWindow: 500000 }
+    }
+
+    const shared = {
+      h: React.createElement,
+      hooks: React,
+      t: (key) => key
+    }
+
+    const StatsComponent = createDockStats(shared)
+    window.renderStats = (projs) => {
+      const root = window.reactRoot || ReactDOM.createRoot(document.getElementById('stats-mount'))
+      window.reactRoot = root
+      root.render(React.createElement(StatsComponent, {
+        useProjection: (key) => projs[key]
+      }))
+    }
+
+    window.renderStats(window.mockProjections)
+  })
+
+  await page.waitForSelector('[data-dsh-simplify-dock-center]')
+  const contextItem = page.locator('.dsh-simplify-stat-item.is-context')
+  assert.equal(await contextItem.textContent(), '121k / 500k (24%)')
+
+  // 模拟上下文压缩发生：宿主裁剪消息后，通过 projectedTokens 立即将活跃表面缩减到 25k
+  await page.evaluate(() => {
+    window.mockProjections = {
+      ...window.mockProjections,
+      contextPressure: {
+        pressureTokens: 121055, // 上一次请求采样的旧值保持不变
+        projectedTokens: 25000,  // 压缩后即时反映的新尺寸
+        contextWindow: 500000
+      }
+    }
+    window.renderStats(window.mockProjections)
+  })
+
+  // 验证底部平铺栏立刻刷新
+  await page.waitForFunction(() => document.querySelector('.dsh-simplify-stat-item.is-context')?.textContent === '25k / 500k (5%)')
+  assert.equal(await contextItem.textContent(), '25k / 500k (5%)')
+
+  // 点击展开弹层验证内部数值也已更新
+  const trigger = page.locator('.dsh-simplify-dock-stats-trigger')
+  await trigger.click()
+  await page.waitForSelector('[data-dsh-simplify-stats-popover][style*="left"]')
+  const popover = page.locator('[data-dsh-simplify-stats-popover]')
+
+  assert.equal(await popover.locator('.dsh-simplify-stats-popover-badge').textContent(), '5% 已用')
+  assert.equal(await popover.locator('.dsh-simplify-stats-progress-header strong').textContent(), '25k / 500k')
+  assert.match(await popover.locator('.dsh-simplify-stats-progress-footer').textContent(), /剩余空间: 475,000 tokens/)
+})

@@ -122,7 +122,47 @@ describe('calculateContextCapacity', () => {
       remainingTokens: 378945,
       usedPercent: 24,
       level: 'comfortable',
-      bucket: 'good'
+      bucket: 'good',
+      breakdown: undefined
+    })
+  })
+
+  it('上下文压缩后优先采用 projectedTokens，立即刷新反映压缩后的容量', () => {
+    // 压缩前：LLM 请求采样的 pressureTokens 为 121,055
+    // 压缩后：表面积削减，projectedTokens 立即降为 25,000
+    const pressure: ContextPressureProjection = {
+      pressureTokens: 121055,
+      projectedTokens: 25000,
+      contextWindow: 500000
+    }
+    const cap = calculateContextCapacity(pressure)
+    expect(cap).toEqual({
+      usedTokens: 25000,
+      contextWindow: 500000,
+      remainingTokens: 475000,
+      usedPercent: 5,
+      level: 'comfortable',
+      bucket: 'good',
+      breakdown: undefined
+    })
+  })
+
+  it('支持传入 contextBreakdown 提供构成明细', () => {
+    const pressure: ContextPressureProjection = {
+      projectedTokens: 30000,
+      contextWindow: 100000
+    }
+    const breakdown = {
+      systemTokens: 8000,
+      toolsTokens: 12000,
+      messageTokens: 10000
+    }
+    const cap = calculateContextCapacity(pressure, undefined, breakdown)
+    expect(cap?.breakdown).toEqual({
+      systemTokens: 8000,
+      toolsTokens: 12000,
+      messageTokens: 10000,
+      totalTokens: 30000
     })
   })
 

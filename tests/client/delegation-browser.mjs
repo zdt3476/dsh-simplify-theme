@@ -19,6 +19,7 @@ before(async () => {
   server = await createServer({ configFile: false, server: { host: '127.0.0.1', port: 0 },
     plugins: [{ name: 'test-page', configureServer(vite) {
       vite.middlewares.use((req, res, next) => {
+        if (req.url === '/favicon.ico') { res.statusCode = 204; res.end(); return }
         if (req.url !== '/fixture') return next()
         res.setHeader('Content-Type', 'text/html')
         res.end('<!doctype html><html><head></head><body><main id="chat"></main></body></html>')
@@ -103,12 +104,14 @@ test('宿主步骤折叠时摘要仍然可见', async t => {
 test('摘要默认折叠、展开后可打开子会话及绘制连接线', async t => {
   const page = await setup(t, { batches: false })
   await waitCount(page, hosts, 1)
+  await page.screenshot({ path: '/tmp/delegation-collapsed.png' })
   assert.equal(await page.locator(summary).getAttribute('aria-expanded'), 'false')
   assert.equal(await page.locator('.subagent-topology-detail').isVisible(), false)
   await page.locator(summary).click()
   assert.equal(await page.locator(summary).getAttribute('aria-expanded'), 'true')
   assert.equal(await page.locator('.subagent-topology-detail').isVisible(), true)
   await page.waitForFunction(() => document.querySelector('.subagent-topology-lines path')?.getAttribute('d'))
+  await page.screenshot({ path: '/tmp/delegation-expanded.png' })
   await page.locator('.subagent-topology-node-header').first().click()
   assert.deepEqual(await page.evaluate(() => window.fixture.opened), [A])
   await page.locator(summary).click()

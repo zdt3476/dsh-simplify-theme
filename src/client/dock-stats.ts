@@ -36,6 +36,7 @@ export function createDockStats(shared: DockShared) {
     const stats = props.useProjection?.('sessionStats') as SessionStatsProjection | undefined
     const usage = props.useProjection?.('tokenUsage') as TokenUsageProjection | undefined
     const pressure = props.useProjection?.('contextPressure') as ContextPressureProjection | undefined
+    const breakdown = props.useProjection?.('contextBreakdown') as import('./composer-stats').ContextBreakdownProjection | undefined
 
     const [open, setOpen] = hooks.useState(false)
     const [pos, setPos] = hooks.useState<Placement | null>(null)
@@ -55,7 +56,7 @@ export function createDockStats(shared: DockShared) {
       return () => window.clearInterval(timer)
     }, [])
 
-    const model = deriveComposerStats(stats, usage, pressure)
+    const model = deriveComposerStats(stats, usage, pressure, undefined, breakdown)
 
     // 弹层定位在 dock 中央上方
     hooks.useEffect(() => {
@@ -75,7 +76,7 @@ export function createDockStats(shared: DockShared) {
         'center',
         'top'
       ))
-    }, [open, stats, usage, pressure])
+    }, [open, stats, usage, pressure, breakdown])
 
     hooks.useEffect(() => {
       if (!open) return
@@ -172,12 +173,36 @@ export function createDockStats(shared: DockShared) {
           h('strong', {}, `${formatCompactTokens(model.context.usedTokens)} / ${formatCompactTokens(model.context.contextWindow)}`)
         ),
         h('div', { className: 'dsh-simplify-stats-progress-track' },
-          h('div', {
+          model.context.breakdown && model.context.breakdown.totalTokens > 0 ? [
+            h('div', {
+              key: 'seg-sys',
+              className: 'dsh-simplify-stats-progress-fill is-segment is-system',
+              title: `系统提示词: ${model.context.breakdown.systemTokens.toLocaleString()} tokens`,
+              style: { width: `${Math.min(100, (model.context.breakdown.systemTokens / model.context.contextWindow) * 100)}%` }
+            }),
+            h('div', {
+              key: 'seg-tools',
+              className: 'dsh-simplify-stats-progress-fill is-segment is-tools',
+              title: `工具定义: ${model.context.breakdown.toolsTokens.toLocaleString()} tokens`,
+              style: { width: `${Math.min(100, (model.context.breakdown.toolsTokens / model.context.contextWindow) * 100)}%` }
+            }),
+            h('div', {
+              key: 'seg-messages',
+              className: 'dsh-simplify-stats-progress-fill is-segment is-messages',
+              title: `对话与压缩历史: ${model.context.breakdown.messageTokens.toLocaleString()} tokens`,
+              style: { width: `${Math.min(100, (model.context.breakdown.messageTokens / model.context.contextWindow) * 100)}%` }
+            })
+          ] : h('div', {
             className: 'dsh-simplify-stats-progress-fill',
             'data-bucket': model.context.bucket,
             style: { width: `${Math.min(100, Math.max(0, model.context.usedPercent))}%` }
           })
         ),
+        model.context.breakdown && model.context.breakdown.totalTokens > 0 ? h('div', { className: 'dsh-simplify-stats-breakdown-legend' },
+          h('span', { className: 'dsh-simplify-legend-chip is-system' }, `系统 ${formatCompactTokens(model.context.breakdown.systemTokens)}`),
+          h('span', { className: 'dsh-simplify-legend-chip is-tools' }, `工具 ${formatCompactTokens(model.context.breakdown.toolsTokens)}`),
+          h('span', { className: 'dsh-simplify-legend-chip is-messages' }, `消息 ${formatCompactTokens(model.context.breakdown.messageTokens)}`)
+        ) : null,
         h('div', { className: 'dsh-simplify-stats-progress-footer' },
           h('span', {}, `剩余空间: ${model.context.remainingTokens.toLocaleString()} tokens`),
           h('span', {}, `上限: ${model.context.contextWindow.toLocaleString()}`)
