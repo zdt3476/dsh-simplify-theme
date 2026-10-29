@@ -12,6 +12,7 @@
 import type { ArchivedFilter } from './view-state'
 import { VIEW_STORE_KEY, readArchivedFilter } from './view-state'
 import { sidebarHeader } from './sidebar-dom'
+import { useSimplifyConfig } from './plugin-config'
 
 export interface WorkspaceViewActions {
   setArchivedFilter: (filter: ArchivedFilter) => void
@@ -76,6 +77,7 @@ export function mountSidebarTabs(options: SidebarTabsOptions): Mount | null {
   const root = createRoot(container)
 
   const Tabs = () => {
+    const [config] = useSimplifyConfig(React.hooks)
     const [state, setState] = React.hooks.useState<TabState>(() => ({ active: readArchivedFilter(localStorage.getItem(VIEW_STORE_KEY)) }))
     const labels = tabLabels(options.locale)
 
@@ -86,6 +88,8 @@ export function mountSidebarTabs(options: SidebarTabsOptions): Mount | null {
       }, POLL_MS)
       return () => window.clearInterval(timer)
     }, [])
+
+    if (!config.sidebarTabs) return null
 
     const pick = (filter: ArchivedFilter) => {
       options.workspace().view.setArchivedFilter(filter)

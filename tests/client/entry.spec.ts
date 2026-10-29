@@ -58,6 +58,8 @@ describe('client entry', () => {
 
     const injected = slotInjects.map((entry) => entry.name)
     expect(injected).toContain('conversation.composer.dock')
+    expect(injected).toContain('plugins.bundle.config')
+    expect(injected).toContain('plugins.row.config')
     // 供应商前缀由 dock 模型 pill 承担；不再占用 label slot（避免 '·' 拼接观感）。
     expect(injected).not.toContain('conversation.input.model.label')
 

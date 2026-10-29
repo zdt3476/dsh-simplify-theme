@@ -14,6 +14,7 @@ import type { ModelDirectories } from './model-directory'
 import { createModelControl } from './model-control'
 import { createPermissionControl } from './permission-control'
 import { createDockStats } from './dock-stats'
+import { useSimplifyConfig } from './plugin-config'
 import type { DockShared, H } from './dock-shared'
 
 export interface DockHostProps {
@@ -41,12 +42,13 @@ export function createDockControl(props: DockHostProps) {
 
   return function DockControl(runtimeProps?: { useProjection?: (key: string) => unknown }) {
     const useProj = runtimeProps?.useProjection ?? props.useProjection
+    const [config] = useSimplifyConfig(props.shared.hooks)
     // slot 路径：标准 hook 读会话权限投影，作为 runtime 值下传。
     const projection = useProj('permissions') as { currentValue: string } | undefined
     return h('div', { 'data-dsh-simplify-dock': '' },
-      h('div', { 'data-dsh-simplify-dock-left': '' }, h(model as never, {})),
-      h(stats as never, { useProjection: useProj }),
-      h('div', { 'data-dsh-simplify-dock-right': '' }, h(permission as never, { permissionValue: projection?.currentValue }))
+      h('div', { 'data-dsh-simplify-dock-left': '' }, config.modelControl ? h(model as never, {}) : null),
+      config.dockStats ? h(stats as never, { useProjection: useProj }) : null,
+      h('div', { 'data-dsh-simplify-dock-right': '' }, config.permissionControl ? h(permission as never, { permissionValue: projection?.currentValue }) : null)
     )
   }
 }

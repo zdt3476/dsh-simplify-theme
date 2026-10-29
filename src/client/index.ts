@@ -28,6 +28,8 @@ import { CURRENT_SESSION_KEY, readCurrentSessionId } from './hero-dock'
 import { readArchivedFilter, VIEW_STORE_KEY } from './view-state'
 import { withFallback } from './locale-fallback'
 import { createDockControl } from './dock-control'
+import { createPluginSettings } from './plugin-settings'
+import { loadSimplifyConfig, onSimplifyConfigChange } from './plugin-config'
 import type { DockShared, H, ReactHooks } from './dock-shared'
 import type { ModelDirectories } from './model-directory'
 import type { PermissionSession } from './permission-control'
@@ -96,6 +98,8 @@ const DICT_ZH: Record<string, string> = {
   'groups.collapse': '收起工作区',
   'groups.pin': '置顶',
   'groups.pinHint': '选择要置顶的工作区',
+  'groups.pinnedTitle': '置顶',
+  'groups.unpinnedTitle': '工作区',
   'model.placeholder': '选择模型',
   'model.title': '选择模型',
   'model.providers': '{count} 个供应商',
@@ -156,6 +160,8 @@ const DICT_EN: Record<string, string> = {
   'groups.collapse': 'Collapse workspaces',
   'groups.pin': 'Pin',
   'groups.pinHint': 'Pick workspaces to pin',
+  'groups.pinnedTitle': 'Pinned',
+  'groups.unpinnedTitle': 'Workspaces',
   'model.placeholder': 'Select model',
   'model.title': 'Select model',
   'model.providers': '{count} providers',
@@ -431,6 +437,33 @@ function registerDock(ctx: ClientCtx): void {
   ))
 }
 
+function registerPluginSettings(ctx: ClientCtx): void {
+  const react = require('react') as unknown as { createElement: unknown }
+  const hooks = require('react') as unknown as ReactHooks
+  const h = react.createElement as H
+  const t = withFallback(ctx.locale.bind(PLUGIN_ID), DICT_ZH)
+  const shared: DockShared = { h, hooks, t }
+  const settingsComponent = createPluginSettings(shared)
+
+  // 1. 注册到包级配置：当用户在插件管理列表点击 dsh-simplify-theme 时直接呈现
+  ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register(
+    {
+      name: 'plugins.bundle.config',
+      key: 'dsh-simplify-theme'
+    },
+    settingsComponent as never
+  ))
+
+  // 2. 注册到行级配置：当用户点击插件内的具体 simplify-theme 行时呈现
+  ctx.slots.inject('plugins.row.config', () => ctx.slots.register(
+    {
+      name: 'plugins.row.config',
+      key: 'dsh-simplify-theme#simplify-theme'
+    },
+    settingsComponent as never
+  ))
+}
+
 /** 单步执行并上报失败；一步抛错不拖垮其余功能。 */
 function step(label: string, run: () => void): void {
   try {
@@ -447,9 +480,31 @@ export function apply(ctx: ClientCtx): void {
   if (typeof document !== 'undefined') document.documentElement.dataset.dshSimplifyBuild = BUILD
   step('locale', () => ctx.locale.register(PLUGIN_ID, { zh: DICT_ZH, en: DICT_EN }))
   if (ctx.theme !== undefined) {
-    step('theme', () => ctx.effect(() => ctx.theme!.overrideTokens(THEME_SOURCE, SIMPLIFY_TOKENS), 'simplify-theme: token layer'))
+    step('theme', () => {
+      let currentConfig = loadSimplifyConfig()
+      let disposer: (() => void) | undefined
+      const applyTheme = () => {
+        disposer?.()
+        disposer = undefined
+        if (currentConfig.themeOverrides) {
+          disposer = ctx.theme!.overrideTokens(THEME_SOURCE, SIMPLIFY_TOKENS)
+        }
+      }
+      ctx.effect(() => {
+        applyTheme()
+        const unsub = onSimplifyConfigChange((cfg) => {
+          currentConfig = cfg
+          applyTheme()
+        })
+        return () => {
+          unsub()
+          disposer?.()
+        }
+      }, 'simplify-theme: token layer')
+    })
   }
   step('styles', () => installStyles(ctx))
   step('tabs', () => mountSidebarTabsSafe(ctx))
   step('dock', () => registerDock(ctx))
+  step('settings', () => registerPluginSettings(ctx))
 }

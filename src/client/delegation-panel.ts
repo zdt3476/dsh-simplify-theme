@@ -11,6 +11,7 @@
  */
 
 import { toDelegationNode, type DelegationNode, type SessionRow, type SessionRows } from './delegation-tree'
+import { loadSimplifyConfig, onSimplifyConfigChange } from './plugin-config'
 
 const TURN = '[data-chat-turn]'
 const TOOL_ROW = '[data-tool]'
@@ -248,6 +249,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
   const hosts = new Map<Element, HTMLElement>()
   const refreshed = new Set<string>()
   const expandedBatches = new WeakSet<HTMLElement>()
+  const userToggled = new WeakSet<HTMLElement>()
   const painters = new Map<HTMLElement, () => void>()
   const claimedByRow = new WeakMap<HTMLElement, string>()
   let ticker: number | undefined
@@ -398,8 +400,12 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
       summary.title = options.locale(open ? 'delegation.collapse' : 'delegation.expand')
       if (open) window.requestAnimationFrame(repaint)
     }
-    apply(expandedBatches.has(host))
+    const initialOpen = userToggled.has(host)
+      ? expandedBatches.has(host)
+      : (expandedBatches.has(host) || loadSimplifyConfig().delegationExpandedDefault)
+    apply(initialOpen)
     summary.addEventListener('click', () => {
+      userToggled.add(host)
       const open = section.classList.contains('is-collapsed')
       if (open) expandedBatches.add(host)
       else expandedBatches.delete(host)
@@ -412,6 +418,19 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
 
   const sync = () => {
     frame = 0
+    const config = loadSimplifyConfig()
+    if (!config.delegationPanel) {
+      for (const [anchor, host] of hosts) {
+        host.remove()
+        painters.delete(host)
+        hosts.delete(anchor)
+      }
+      for (const row of document.querySelectorAll(`[${SOURCE_ATTR}]`)) {
+        row.removeAttribute(SOURCE_ATTR)
+      }
+      return
+    }
+
     const parentId = options.currentSessionId()
     const snapshot = options.sessions.getSnapshot() as {
       byId?: SessionRows
@@ -583,6 +602,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
   window.addEventListener('resize', repaintAll)
 
   const unsubscribe = options.sessions.subscribe(schedule)
+  const unsubscribeConfig = onSimplifyConfigChange(schedule)
   const observer = new MutationObserver(schedule)
   observer.observe(document.body, { childList: true, subtree: true })
   schedule()
@@ -590,6 +610,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
   return {
     dispose: () => {
       unsubscribe()
+      unsubscribeConfig()
       observer.disconnect()
       window.removeEventListener('resize', repaintAll)
       if (ticker !== undefined) window.clearInterval(ticker)

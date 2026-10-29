@@ -1,12 +1,16 @@
 # dsh-simplify-theme
 
+<p align="center">
+  <img src="docs/images/icon.png" width="108" height="108" alt="dsh-simplify-theme icon" style="border-radius: 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.12);" />
+</p>
+
 给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的极简主题，外加一组界面增强。
 
 主题部分只做一件事：在当前配色之上叠一层 token，压掉装饰性噪音——去投影、去毛玻璃、
 收紧圆角、气泡与交互态中性化。交互增强部分全部在浏览器侧完成，不新增 Host 行为，
 禁用插件即完全还原。
 
-- 版本：0.3.8
+- 版本：0.3.9
 - 环境：DSH ≥ 0.2.0；运行时需要 `react` / `react-dom`（由宿主 ModuleLoader 提供）
 
 ## 当前界面
@@ -46,7 +50,7 @@ dsh plugin --profile desktop add git+https://github.com/zdt3476/dsh-simplify-the
 dsh plugin --profile desktop add link:"$PWD"
 
 # Release 里的预构建包
-dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/releases/download/v0.3.8/dsh-simplify-theme-0.3.8.tgz
+dsh plugin --profile desktop add https://github.com/zdt3476/dsh-simplify-theme/releases/download/v0.3.9/dsh-simplify-theme-0.3.9.tgz
 ```
 
 把 `desktop` 换成你实际使用的 profile（`dsh web` 默认是 `web`）。**首次安装后需要重启 DSH**；

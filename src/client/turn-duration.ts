@@ -31,6 +31,8 @@ export interface RunningSnapshot {
   byId: Record<string, unknown>
 }
 
+import { loadSimplifyConfig, onSimplifyConfigChange } from './plugin-config'
+
 export interface TurnDurationOptions {
   /** 会话列表快照源。 */
   sessions: { getSnapshot: () => RunningSnapshot; subscribe: (listener: () => void) => () => void }
@@ -77,6 +79,12 @@ export function mountTurnDuration(options: TurnDurationOptions): TurnDurationMou
   let lastSessionId: string | undefined
 
   const apply = () => {
+    const config = loadSimplifyConfig()
+    if (!config.turnDuration) {
+      for (const element of document.querySelectorAll(`[${MARK}]`)) element.remove()
+      return
+    }
+
     const sessionId = options.currentSessionId()
     if (sessionId !== lastSessionId) {
       // 换会话：清掉旧徽标，避免耗时挂在别的会话上。
@@ -115,11 +123,19 @@ export function mountTurnDuration(options: TurnDurationOptions): TurnDurationMou
       console.error('[dsh-simplify-theme] turn duration failed:', error)
     }
   })
+  const unsubscribeConfig = onSimplifyConfigChange(() => {
+    try {
+      apply()
+    } catch (error) {
+      console.error('[dsh-simplify-theme] turn duration config change failed:', error)
+    }
+  })
   apply()
 
   return {
     unmount: () => {
       unsubscribe()
+      unsubscribeConfig()
       for (const element of document.querySelectorAll(`[${MARK}]`)) element.remove()
     }
   }

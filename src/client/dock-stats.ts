@@ -24,6 +24,7 @@ import {
   type TokenUsageProjection,
   type ContextPressureProjection
 } from './composer-stats'
+import { useSimplifyConfig } from './plugin-config'
 
 export interface DockStatsProps {
   useProjection?: (key: string) => unknown
@@ -37,6 +38,7 @@ export function createDockStats(shared: DockShared) {
     const usage = props.useProjection?.('tokenUsage') as TokenUsageProjection | undefined
     const pressure = props.useProjection?.('contextPressure') as ContextPressureProjection | undefined
     const breakdown = props.useProjection?.('contextBreakdown') as import('./composer-stats').ContextBreakdownProjection | undefined
+    const [config] = useSimplifyConfig(hooks)
 
     const [open, setOpen] = hooks.useState(false)
     const [pos, setPos] = hooks.useState<Placement | null>(null)
@@ -106,7 +108,7 @@ export function createDockStats(shared: DockShared) {
         h('span', {
           key: 'context',
           className: 'dsh-simplify-stat-item is-context',
-          'data-dsh-simplify-pct': model.context.bucket,
+          'data-dsh-simplify-pct': config.contextColorAlert ? model.context.bucket : undefined,
           'data-dsh-simplify-pct-kind': 'context'
         }, model.context.label)
       )

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { workspaceActivity, orderWorkspaceGroups } from '../../src/client/sidebar-activity'
+import { visibleGroupIds, hiddenCount } from '../../src/client/sidebar-groups'
 
 const workspaces = [
   { workspaceId: 'a', createdAt: '2026-01-01T00:00:00Z', sessionIds: ['old', 'new', 'archived'] },
@@ -32,5 +33,31 @@ describe('workspace activity', () => {
     expect(ordered.map(group => group.id)).toEqual(['pin', 'new', 'tie', 'old'])
     expect(groups[0].id).toBe('old')
     expect(orderWorkspaceGroups(groups, new Map()).map(group => group.id)).toEqual(['pin', 'old', 'new', 'tie'])
+  })
+
+  it('支持根据 unpinnedLimit 和 pinnedLimit 独立限制折叠可见数量', () => {
+    const groups = [
+      { id: 'p1', pinned: true },
+      { id: 'p2', pinned: true },
+      { id: 'p3', pinned: true },
+      { id: 'u1', pinned: false },
+      { id: 'u2', pinned: false },
+      { id: 'u3', pinned: false },
+      { id: 'u4', pinned: false }
+    ]
+
+    // 默认：最多 5 个置顶，最多 5 个未置顶（全部 7 个均可见）
+    expect(visibleGroupIds(groups).size).toBe(7)
+    expect(hiddenCount(groups)).toBe(0)
+
+    // 置顶限制为 2，未置顶限制为 2
+    const visible = visibleGroupIds(groups, 2, 2)
+    expect([...visible]).toEqual(['p1', 'p2', 'u1', 'u2'])
+    expect(hiddenCount(groups, 2, 2)).toBe(3) // p3, u3, u4 被折叠
+
+    // 置顶设为 0 时表示不限制置顶，全部 3 个置顶常驻，普通项展示前 1 个
+    const unlimitedPinned = visibleGroupIds(groups, 1, 0)
+    expect([...unlimitedPinned]).toEqual(['p1', 'p2', 'p3', 'u1'])
+    expect(hiddenCount(groups, 1, 0)).toBe(3) // u2, u3, u4 被折叠
   })
 })

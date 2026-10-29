@@ -12,6 +12,7 @@
 import type { ArchivedFilter } from './view-state'
 import { orderWorkspaceGroups, workspaceActivity } from './sidebar-activity'
 import type { ActivityStore, SessionActivitySnapshot, WorkspaceActivitySnapshot } from './sidebar-activity'
+import { loadSimplifyConfig, onSimplifyConfigChange } from './plugin-config'
 
 export const PINNED_KEY = 'dsh-simplify-theme.pinned-workspaces'
 export const EXPANDED_KEY = 'dsh-simplify-theme.workspaces-expanded'
@@ -34,17 +35,27 @@ export function parsePinned(raw: string | null): string[] {
 }
 
 /**
- * 折叠后应保持可见的组：置顶始终可见，其余取排序后的前 `limit` 个。
+ * 折叠后应保持可见的组：
+ * - unpinnedLimit: 未置顶文件夹可见数量上限（默认 5）
+ * - pinnedLimit: 置顶文件夹可见数量上限（默认 5；若 <= 0 则全部置顶可见）
  */
-export function visibleGroupIds(groups: readonly GroupInfo[], limit = COLLAPSED_LIMIT): Set<string> {
+export function visibleGroupIds(
+  groups: readonly GroupInfo[],
+  unpinnedLimit = COLLAPSED_LIMIT,
+  pinnedLimit = 5
+): Set<string> {
   const visible = new Set<string>()
   let ordinary = 0
+  let pinned = 0
   for (const group of groups) {
     if (group.pinned) {
-      visible.add(group.id)
+      if (pinnedLimit <= 0 || pinned < pinnedLimit) {
+        visible.add(group.id)
+        pinned += 1
+      }
       continue
     }
-    if (ordinary < limit) {
+    if (ordinary < unpinnedLimit) {
       visible.add(group.id)
       ordinary += 1
     }
@@ -53,8 +64,12 @@ export function visibleGroupIds(groups: readonly GroupInfo[], limit = COLLAPSED_
 }
 
 /** 折叠按钮文案：还有多少个组被收起。 */
-export function hiddenCount(groups: readonly GroupInfo[], limit = COLLAPSED_LIMIT): number {
-  const visible = visibleGroupIds(groups, limit)
+export function hiddenCount(
+  groups: readonly GroupInfo[],
+  unpinnedLimit = COLLAPSED_LIMIT,
+  pinnedLimit = 5
+): number {
+  const visible = visibleGroupIds(groups, unpinnedLimit, pinnedLimit)
   return groups.filter((group) => !visible.has(group.id)).length
 }
 
@@ -119,6 +134,17 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
   pinButton.title = options.locale('groups.pinHint')
   controls.appendChild(pinButton)
 
+  // 侧栏独立小节分区分组（方案 A：Linear / Slack / Notion 风格）
+  const pinnedHeader = options.createElement('div')
+  pinnedHeader.className = 'dsh-simplify-sidebar-section is-pinned'
+  pinnedHeader.dataset.dshSimplifySection = 'pinned'
+  pinnedHeader.hidden = true
+
+  const unpinnedHeader = options.createElement('div')
+  unpinnedHeader.className = 'dsh-simplify-sidebar-section is-unpinned'
+  unpinnedHeader.dataset.dshSimplifySection = 'unpinned'
+  unpinnedHeader.hidden = true
+
   // 面板挂到 body：侧栏标题行是 overflow:hidden，放在里面会被裁成一条。
   const panel = options.createElement('div')
   panel.dataset.dshSimplifyPinPanel = ''
@@ -168,6 +194,26 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
   const apply = () => {
     frame = 0
     const groups = collectGroups(slot)
+    const config = loadSimplifyConfig()
+
+    if (!config.sidebarGrouping) {
+      pinnedHeader.hidden = true
+      unpinnedHeader.hidden = true
+      for (const group of groups) {
+        group.element.removeAttribute('data-dsh-simplify-group')
+        group.element.removeAttribute('data-dsh-simplify-pinned')
+        group.element.removeAttribute('data-dsh-simplify-collapsed')
+        group.element.removeAttribute('data-dsh-simplify-pinned-tail')
+        group.row.removeAttribute('data-dsh-simplify-count')
+        group.row.removeAttribute('title')
+        const prevOrder = originalOrders.get(group.element)
+        if (prevOrder !== undefined) group.element.style.order = prevOrder
+      }
+      controls.hidden = true
+      return
+    }
+    controls.hidden = false
+
     const archived = options.archivedFilter()
     const collapse = archived === 'default' && !expanded
 
@@ -182,17 +228,53 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
     const workspace = options.workspaces.getSnapshot()
     const activity = workspaceActivity(workspace.items, options.sessions.getSnapshot().byId, workspace.archivedSessionIds, archived)
     const ranked = orderWorkspaceGroups(groups.map(group => ({ ...group, pinned: pinned.has(group.id) })), activity)
-    const visible = visibleGroupIds(ranked)
+    const visible = visibleGroupIds(ranked, config.sidebarUnpinnedLimit, config.sidebarPinnedLimit)
+
+    const listContainer = groups[0]?.element.parentElement ?? null
+    if (listContainer !== null) {
+      if (pinnedHeader.parentElement !== listContainer) listContainer.appendChild(pinnedHeader)
+      if (unpinnedHeader.parentElement !== listContainer) listContainer.appendChild(unpinnedHeader)
+    }
+
+    const pinnedGroupIds = new Set(groups.filter(g => pinned.has(g.id)).map(g => g.id))
+    const pinnedCount = pinnedGroupIds.size
+    const unpinnedCount = ranked.length - pinnedCount
+
+    if (pinnedCount > 0) {
+      pinnedHeader.hidden = false
+      pinnedHeader.style.order = String(-ranked.length * 2 - 2)
+      pinnedHeader.innerHTML = `
+        <span class="dsh-simplify-section-title"><span class="dsh-simplify-section-icon" aria-hidden="true">📌</span>${options.locale('groups.pinnedTitle')}</span>
+        <span class="dsh-simplify-section-badge">${pinnedCount}</span>
+      `
+
+      if (unpinnedCount > 0) {
+        unpinnedHeader.hidden = false
+        unpinnedHeader.style.order = String((pinnedCount - ranked.length) * 2 - 1)
+        unpinnedHeader.innerHTML = `
+          <span class="dsh-simplify-section-title">${options.locale('groups.unpinnedTitle')}</span>
+          <span class="dsh-simplify-section-badge">${unpinnedCount}</span>
+        `
+      } else {
+        unpinnedHeader.hidden = true
+      }
+    } else {
+      pinnedHeader.hidden = true
+      unpinnedHeader.hidden = true
+    }
+
     for (const [index, group] of ranked.entries()) {
       if (!originalOrders.has(group.element)) originalOrders.set(group.element, group.element.style.order)
-      group.element.style.order = String(index - ranked.length)
+      group.element.style.order = String((index - ranked.length) * 2)
       group.element.toggleAttribute('data-dsh-simplify-collapsed', collapse && !visible.has(group.id))
+      const isPinned = pinnedGroupIds.has(group.id)
+      group.element.toggleAttribute('data-dsh-simplify-pinned', isPinned)
     }
 
     if (pinned.size > 0) pinButton.title = `${options.locale('groups.pinHint')}（已置顶 ${pinned.size} 个）`
     else pinButton.title = options.locale('groups.pinHint')
 
-    const hidden = hiddenCount(ranked)
+    const hidden = hiddenCount(ranked, config.sidebarUnpinnedLimit, config.sidebarPinnedLimit)
     toggle.hidden = hidden === 0 && !expanded
     const label = expanded
       ? options.locale('groups.collapse')
@@ -245,6 +327,7 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
   observer.observe(slot, { childList: true, subtree: true })
   const unsubscribeWorkspaces = options.workspaces.subscribe(schedule)
   const unsubscribeSessions = options.sessions.subscribe(schedule)
+  const unsubscribeConfig = onSimplifyConfigChange(schedule)
   schedule()
 
   return {
@@ -252,6 +335,7 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
       observer.disconnect()
       unsubscribeWorkspaces()
       unsubscribeSessions()
+      unsubscribeConfig()
       document.removeEventListener('pointerdown', closeOnOutside, true)
       document.removeEventListener('keydown', closeOnKey, true)
       window.removeEventListener('scroll', closeOnScroll, true)
@@ -267,6 +351,8 @@ export function mountSidebarGroups(options: SidebarGroupsOptions): SidebarGroups
       }
       controls.remove()
       panel.remove()
+      pinnedHeader.remove()
+      unpinnedHeader.remove()
     }
   }
 }
