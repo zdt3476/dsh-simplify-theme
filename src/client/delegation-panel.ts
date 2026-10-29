@@ -46,7 +46,8 @@ export function matchSubagentId(
   rows: SessionRows,
   parentId: string | undefined,
   claimed: ReadonlySet<string>,
-  candidateIds?: readonly string[]
+  candidateIds?: readonly string[],
+  catalogEntries?: ReadonlyArray<{ id: string; label?: string }>
 ): string | undefined {
   const matchesParent = (p: string | undefined) =>
     parentId === undefined || p === parentId || (p !== undefined && p.replace(/^session-/, '') === parentId.replace(/^session-/, ''))
@@ -65,11 +66,24 @@ export function matchSubagentId(
         .filter((entry): entry is [string, SessionRow] => entry[1] !== undefined && entry[1].origin === 'subagent' && matchesParent(entry[1].parentId))
         .map(([id, row]) => ({ id, row }))
 
-  // 2. 描述 / 标题包含匹配
+  // 2. 描述 / 标题包含匹配（支持 SessionRow.displayTitle、title 以及 subagentCatalog 原始 label）
+  const labelById = new Map<string, string>()
+  if (catalogEntries !== undefined) {
+    for (const entry of catalogEntries) {
+      if (typeof entry.label === 'string' && entry.label.length >= 2) {
+        labelById.set(entry.id, entry.label)
+      }
+    }
+  }
+
   for (const { id, row } of candidates) {
     if (claimed.has(id)) continue
-    const title = row.displayTitle ?? (row as { title?: string }).title
+    const title = row.displayTitle ?? (row as { title?: string }).title ?? labelById.get(id)
     if (typeof title === 'string' && title.length >= 2 && rowText.includes(title)) {
+      return id
+    }
+    const label = labelById.get(id)
+    if (label !== undefined && label.length >= 2 && rowText.includes(label)) {
       return id
     }
   }
@@ -235,6 +249,7 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
   const refreshed = new Set<string>()
   const expandedBatches = new WeakSet<HTMLElement>()
   const painters = new Map<HTMLElement, () => void>()
+  const claimedByRow = new WeakMap<HTMLElement, string>()
   let ticker: number | undefined
   let frame = 0
   let debug = false
@@ -424,7 +439,11 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
     const candidateIds = [...catalogIds, ...otherIds]
     const claimed = new Set<string>()
 
-    for (const turn of document.querySelectorAll(TURN)) {
+    // 过滤掉嵌套在其他 [data-chat-turn] 内部的元素，避免外层容器与内层节点重复扫描相同工具行
+    const allTurnElements = [...document.querySelectorAll<HTMLElement>(TURN)]
+    const turnElements = allTurnElements.filter((el) => el.parentElement?.closest(TURN) === null)
+
+    for (const turn of turnElements) {
       // 按聊天节点顺序切批：连续委派算一批，中间出现别的工具调用就断开。
       const groups: Array<{ anchor: Element; rows: HTMLElement[] }> = []
       let current: { anchor: Element; rows: HTMLElement[] } | null = null
@@ -452,7 +471,13 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
         const seen = new Set<string>()
         for (const row of group.rows) {
           rowCount += 1
-          const matchedId = matchSubagentId(row.textContent ?? '', rows, parentId, claimed, candidateIds)
+          let matchedId = claimedByRow.get(row)
+          if (matchedId === undefined || !candidateIds.includes(matchedId)) {
+            matchedId = matchSubagentId(row.textContent ?? '', rows, parentId, claimed, candidateIds, catalogEntries)
+            if (matchedId !== undefined) {
+              claimedByRow.set(row, matchedId)
+            }
+          }
           const ids = matchedId !== undefined ? [matchedId] : []
           if (matchedId !== undefined) claimed.add(matchedId)
           const rawState = row.getAttribute('data-state')
@@ -474,18 +499,17 @@ export function mountDelegationPanel(options: DelegationPanelOptions): Delegatio
       }
     }
 
-    // 批次按文档顺序编号，避免嵌套 data-chat-turn 造成的重复挂载。
+    // 批次按文档顺序连续递增编号，跨回合保持全局时序递增（第 1 次委派、第 2 次委派…）
     pending.sort((a, b) => (a.anchor.compareDocumentPosition(b.anchor) & 4) !== 0 ? -1 : 1)
     const placed = new Set<Element>()
-    const indexByTurn = new Map<string | Element, number>()
+    let batchIndex = 0
     // 同一折叠组里的多批委派共用一个挂载点，记录上一张图以保持批次顺序。
     const tailOf = new Map<Element, HTMLElement>()
     for (const { anchor, members } of pending) {
       if (placed.has(anchor)) continue
       placed.add(anchor)
-      const turn = turnKeyOf(anchor)
-      const index = (indexByTurn.get(turn) ?? 0) + 1
-      indexByTurn.set(turn, index)
+      batchIndex += 1
+      const index = batchIndex
       // 挂在工作步骤折叠区之外的同一层，折叠工具细节时摘要仍可见。
       const holder = anchor.closest(STEP_PROCESS) ?? anchor
       const parent = holder.parentElement

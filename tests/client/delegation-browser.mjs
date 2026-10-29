@@ -256,6 +256,137 @@ test('模拟真实宿主折叠工具行（无 UUID，仅描述与状态文本）
   assert.deepEqual(await page.evaluate(() => window.fixture.opened), [A])
 })
 
+test('多轮对话中，第二轮发起新委派应编号为递增批次并正确展示第二轮的子代理', async t => {
+  const page = await browser.newPage()
+  t.after(() => page.close())
+  await page.goto(`${origin}/fixture`)
+  await page.evaluate(async ({ A, B }) => {
+    const { mountDelegationPanel } = await import('/src/client/delegation-panel.ts')
+    const { UI_CSS } = await import('/src/client/styles.ts')
+    const style = document.createElement('style')
+    style.textContent = UI_CSS
+    document.head.append(style)
+    const child = (id, title) => ({
+      id, origin: 'subagent', parentId: 'session-multi-turn', displayTitle: title, running: false,
+      projectionValues: { modelSelection: { model: 'model-a' }, sessionStats: { steps: 2 }, subagentTiming: { settledMs: 5000 } }
+    })
+    const state = window.fixture = {
+      session: 'session-multi-turn',
+      rows: { [A]: child(A, 'Task 1 in Turn 1'), [B]: child(B, 'Task 2 in Turn 2') },
+      listener: () => {}, opened: [], stopped: []
+    }
+    // 模拟真实宿主结构：Turn 1 和 Turn 2 两个独立回合
+    document.querySelector('#chat').innerHTML = `
+      <div id="step-1" data-step-process data-chat-turn="turn-1">
+        <div data-chat-turn="turn-1" data-chat-node-key="t1-node"><div data-tool="subagent" data-state="ok"><span>子智能体</span><span>Task 1 in Turn 1 · 已完成</span></div></div>
+      </div>
+      <div id="step-2" data-step-process data-chat-turn="turn-2">
+        <div data-chat-turn="turn-2" data-chat-node-key="t2-node"><div data-tool="subagent" data-state="ok"><span>子智能体</span><span>Task 2 in Turn 2 · 已完成</span></div></div>
+      </div>
+    `
+    const dict = { 'delegation.batch': p => `Batch ${p.index}`, 'delegation.agents': p => `${p.count} agents`,
+      'delegation.state.done': () => 'Done', 'delegation.state.running': () => 'Running',
+      'delegation.state.failed': () => 'Failed', 'delegation.steps': p => `${p.count} steps`,
+      'duration.s': () => 's', 'duration.m': () => 'm' }
+    state.handle = mountDelegationPanel({
+      sessions: {
+        getSnapshot: () => ({ byId: state.rows, projectionsBySession: { 'session-multi-turn': { values: { subagentCatalog: [{ id: A, label: 'Task 1 in Turn 1' }, { id: B, label: 'Task 2 in Turn 2' }] } } } }),
+        subscribe: fn => { state.listener = fn; return () => { state.listener = () => {} } }
+      },
+      currentSessionId: () => state.session,
+      locale: (key, params = {}) => dict[key]?.(params) ?? key,
+      openSession: id => state.opened.push(id)
+    })
+  }, { A, B })
+
+  await waitCount(page, hosts, 2)
+  const labels = await page.locator('.subagent-topology-summary-label').allTextContents()
+  assert.deepEqual(labels, ['Batch 1', 'Batch 2'])
+  const summaries = page.locator(summary)
+  await summaries.nth(0).click()
+  await summaries.nth(1).click()
+  const titles = await page.locator('.subagent-topology-node-title').allTextContents()
+  assert.deepEqual(titles, ['Task 1 in Turn 1', 'Task 2 in Turn 2'])
+})
+
+test('第一轮对话完成后，动态开启第二轮对话派发子代理，不覆盖旧图且递增计数为第2次委派', async t => {
+  const page = await browser.newPage()
+  t.after(() => page.close())
+  await page.goto(`${origin}/fixture`)
+  await page.evaluate(async ({ A, B }) => {
+    const { mountDelegationPanel } = await import('/src/client/delegation-panel.ts')
+    const { UI_CSS } = await import('/src/client/styles.ts')
+    const style = document.createElement('style')
+    style.textContent = UI_CSS
+    document.head.append(style)
+    const child = (id, title) => ({
+      id, origin: 'subagent', parentId: 'session-dynamic-turns', displayTitle: title, running: false,
+      projectionValues: { modelSelection: { model: 'model-a' }, sessionStats: { steps: 2 }, subagentTiming: { settledMs: 5000 } }
+    })
+    const state = window.fixture = {
+      session: 'session-dynamic-turns',
+      rows: { [A]: child(A, 'Task 1 in Round 1') },
+      catalog: [{ id: A, label: 'Task 1 in Round 1' }],
+      listener: () => {}, opened: [], stopped: []
+    }
+    // 初始状态：只有第一轮对话及其委派
+    document.querySelector('#chat').innerHTML = `
+      <div id="round-1" data-step-process data-chat-turn="turn-1">
+        <div data-chat-turn="turn-1" data-chat-node-key="r1-node"><div data-tool="subagent" data-state="ok"><span>子智能体</span><span>Task 1 in Round 1 · 已完成</span></div></div>
+      </div>
+    `
+    const dict = { 'delegation.batch': p => `Batch ${p.index}`, 'delegation.agents': p => `${p.count} agents`,
+      'delegation.state.done': () => 'Done', 'delegation.state.running': () => 'Running',
+      'delegation.state.failed': () => 'Failed', 'delegation.steps': p => `${p.count} steps`,
+      'duration.s': () => 's', 'duration.m': () => 'm' }
+    state.handle = mountDelegationPanel({
+      sessions: {
+        getSnapshot: () => ({ byId: state.rows, projectionsBySession: { 'session-dynamic-turns': { values: { subagentCatalog: state.catalog } } } }),
+        subscribe: fn => { state.listener = fn; return () => { state.listener = () => {} } }
+      },
+      currentSessionId: () => state.session,
+      locale: (key, params = {}) => dict[key]?.(params) ?? key,
+      openSession: id => state.opened.push(id)
+    })
+  }, { A, B })
+
+  // 第一轮：生成 Batch 1
+  await waitCount(page, hosts, 1)
+  assert.equal(await page.locator('.subagent-topology-summary-label').textContent(), 'Batch 1')
+  await page.locator(summary).click()
+  assert.equal(await page.locator('.subagent-topology-node-title').textContent(), 'Task 1 in Round 1')
+
+  // 模拟开启第二轮聊天：用户发送新指令，模型开启 round-2 并产生新的 subagent 调用
+  await page.evaluate(({ B }) => {
+    const child = (id, title) => ({
+      id, origin: 'subagent', parentId: 'session-dynamic-turns', displayTitle: title, running: false,
+      projectionValues: { modelSelection: { model: 'model-b' }, sessionStats: { steps: 3 }, subagentTiming: { settledMs: 8000 } }
+    })
+    window.fixture.rows[B] = child(B, 'Task 2 in Round 2')
+    window.fixture.catalog.push({ id: B, label: 'Task 2 in Round 2' })
+
+    // 第一轮步骤已被折叠（拥有 hidden 属性与已隐藏工具行），追加第二轮步骤容器
+    document.querySelector('#chat').insertAdjacentHTML('beforeend', `
+      <div id="round-2" data-step-process data-chat-turn="turn-2">
+        <div data-chat-turn="turn-2" data-chat-node-key="r2-node"><div data-tool="subagent" data-state="ok"><span>子智能体</span><span>Task 2 in Round 2 · 已完成</span></div></div>
+      </div>
+    `)
+    window.fixture.listener()
+  }, { B })
+
+  // 验证第二轮追加后生成两个独立宿主
+  await waitCount(page, hosts, 2)
+  const labels = await page.locator('.subagent-topology-summary-label').allTextContents()
+  // 核心断言：第二轮编号为 Batch 2，绝不可回退重置为 Batch 1
+  assert.deepEqual(labels, ['Batch 1', 'Batch 2'])
+
+  // 展开第二轮卡片
+  await page.locator(summary).nth(1).click()
+  const titles = await page.locator('.subagent-topology-node-title').allTextContents()
+  // 核心断言：第二轮必须显示 Task 2，绝不可显示第一轮的旧图 Task 1
+  assert.deepEqual(titles, ['Task 1 in Round 1', 'Task 2 in Round 2'])
+})
+
 test('卸载后删除摘要并恢复原工具行', async t => {
   const page = await setup(t, { batches: false })
   await waitCount(page, hosts, 1)
